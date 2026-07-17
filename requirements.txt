@@ -1,3 +1,4 @@
 streamlit
 pandas
 twilio
+mysql-connector-python
