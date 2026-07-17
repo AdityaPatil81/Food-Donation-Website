@@ -1,9 +1,14 @@
 import streamlit as st
-import sqlite3
+import mysql.connector
 import hashlib
 
 
-DB_PATH = "iotfeedbridge.db"
+MYSQL_CONFIG = {
+    "host":"localhost",
+    "user":"root",
+    "password":"root",
+    "database":"iotfeedbridge"
+}
 
 
 st.set_page_config(
@@ -14,148 +19,139 @@ st.set_page_config(
 )
 
 def get_conn():
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    return conn
+    server_config = MYSQL_CONFIG.copy()
+    database = server_config.pop("database")
+    server_conn = mysql.connector.connect(**server_config)
+    server_cur = server_conn.cursor()
+    server_cur.execute("CREATE DATABASE IF NOT EXISTS " + database)
+    server_cur.close()
+    server_conn.close()
+    return mysql.connector.connect(**MYSQL_CONFIG)
+
+
+def fetch_one(query, params=None):
+    conn = get_conn()
+    cur = conn.cursor(dictionary=True)
+    cur.execute(query, params or ())
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    return row
+
+
+def fetch_all(query, params=None):
+    conn = get_conn()
+    cur = conn.cursor(dictionary=True)
+    cur.execute(query, params or ())
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return rows
+
+
+def execute_commit(query, params=None):
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(query, params or ())
+    conn.commit()
+    cur.close()
+    conn.close()
 
 
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        role TEXT NOT NULL,
-        full_name TEXT,
-        contact TEXT,
-        email TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS food_donations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        donor_id INTEGER,
-        donor_name TEXT,
-        org_name TEXT,
-        contact TEXT,
-        food_type TEXT,
-        food_category TEXT,
-        quantity REAL,
-        quantity_unit TEXT,
-        prep_time TEXT,
-        pickup_address TEXT,
-        special_instructions TEXT,
-        status TEXT DEFAULT 'pending',
-        matched_ngo_id INTEGER,
-        assigned_volunteer_id INTEGER,
-        created_at TEXT DEFAULT (datetime('now'))
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS ngo_demands (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ngo_id INTEGER,
-        ngo_name TEXT,
-        contact_person TEXT,
-        contact TEXT,
-        email TEXT,
-        ngo_address TEXT,
-        service_area TEXT,
-        max_capacity INTEGER,
-        storage_available TEXT,
-        food_type_needed TEXT,
-        quantity_needed REAL,
-        quantity_unit TEXT,
-        priority TEXT DEFAULT 'Medium',
+    cur.execute("""CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(100) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL,
+        full_name VARCHAR(255),
+        contact VARCHAR(50),
+        email VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS food_donations (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        donor_id INT, donor_name VARCHAR(255), org_name VARCHAR(255),
+        contact VARCHAR(50), food_type VARCHAR(50), food_category VARCHAR(50),
+        quantity FLOAT, quantity_unit VARCHAR(50), prep_time VARCHAR(100),
+        pickup_address TEXT, special_instructions TEXT,
+        status VARCHAR(50) DEFAULT 'pending',
+        matched_ngo_id INT, assigned_volunteer_id INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS ngo_demands (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        ngo_id INT, ngo_name VARCHAR(255), contact_person VARCHAR(255),
+        contact VARCHAR(50), email VARCHAR(255), ngo_address TEXT,
+        service_area VARCHAR(255), max_capacity INT,
+        storage_available VARCHAR(50), food_type_needed VARCHAR(50),
+        quantity_needed FLOAT, quantity_unit VARCHAR(50),
+        priority VARCHAR(50) DEFAULT 'Medium', remarks TEXT,
+        status VARCHAR(50) DEFAULT 'pending',
+        matched_donation_id INT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS ngo_responses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        ngo_id INT, donation_id INT, action VARCHAR(50),
+        quantity_accepted FLOAT, preferred_pickup_time VARCHAR(100),
+        priority VARCHAR(50), remarks TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
+    cur.execute("""CREATE TABLE IF NOT EXISTS volunteer_assignments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        volunteer_id INT, donation_id INT,
+        pickup_location TEXT, drop_location TEXT,
+        assigned_time VARCHAR(100),
+        delivery_status VARCHAR(50) DEFAULT 'Assigned',
         remarks TEXT,
-        status TEXT DEFAULT 'pending',
-        matched_donation_id INTEGER,
-        created_at TEXT DEFAULT (datetime('now'))
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS ngo_responses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        ngo_id INTEGER,
-        donation_id INTEGER,
-        action TEXT,
-        quantity_accepted REAL,
-        preferred_pickup_time TEXT,
-        priority TEXT,
-        remarks TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS volunteer_assignments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        volunteer_id INTEGER,
-        donation_id INTEGER,
-        pickup_location TEXT,
-        drop_location TEXT,
-        assigned_time TEXT,
-        delivery_status TEXT DEFAULT 'Assigned',
-        remarks TEXT,
-        created_at TEXT DEFAULT (datetime('now'))
-    )
-    """)
-
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )""")
     conn.commit()
+    cur.close()
     conn.close()
-
 
 def hash_pw(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
 def register_user(username, password, role, full_name, contact, email):
-    conn = get_conn()
     try:
-        conn.execute(
-            "INSERT INTO users (username,password,role,full_name,contact,email) VALUES (?,?,?,?,?,?)",
+        execute_commit(
+            "INSERT INTO users (username,password,role,full_name,contact,email) VALUES (%s,%s,%s,%s,%s,%s)",
             (username, hash_pw(password), role, full_name, contact, email)
         )
-        conn.commit()
         return True
-    except sqlite3.IntegrityError:
+    except mysql.connector.IntegrityError:
         return False
-    finally:
-        conn.close()
 
 
 def login_user(username, password, role):
-    conn = get_conn()
-    row = conn.execute(
-        "SELECT * FROM users WHERE username=? AND password=? AND role=?",
+    row = fetch_one(
+        "SELECT * FROM users WHERE username=%s AND password=%s AND role=%s",
         (username, hash_pw(password), role)
-    ).fetchone()
-    conn.close()
+    )
 
     if row:
-        return dict(row)
+        return row
     return None
 
 
 def db_count(table, where_text="1=1"):
     conn = get_conn()
-    row = conn.execute("SELECT COUNT(*) FROM " + table + " WHERE " + where_text).fetchone()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM " + table + " WHERE " + where_text)
+    row = cur.fetchone()
+    cur.close()
     conn.close()
     return row[0]
 
 
 def find_matches():
-    conn = get_conn()
-    donations = conn.execute("SELECT * FROM food_donations WHERE status='pending'").fetchall()
-    demands = conn.execute("SELECT * FROM ngo_demands WHERE status='pending'").fetchall()
-    conn.close()
+    donations = fetch_all("SELECT * FROM food_donations WHERE status='pending'")
+    demands = fetch_all("SELECT * FROM ngo_demands WHERE status='pending'")
 
     matches = []
 
@@ -171,8 +167,8 @@ def find_matches():
 
             if score >= 2:
                 item = {
-                    "donation": dict(donation),
-                    "demand": dict(demand),
+                    "donation": donation,
+                    "demand": demand,
                     "score": score
                 }
                 matches.append(item)
@@ -462,27 +458,22 @@ def dashboard_donor():
                 if not donor_name or not org_name or quantity <= 0 or not pickup_address:
                     st.error(T("fill_required"))
                 else:
-                    conn = get_conn()
-                    conn.execute("""
+                    execute_commit("""
                     INSERT INTO food_donations
                     (donor_id,donor_name,org_name,contact,food_type,food_category,
                      quantity,quantity_unit,prep_time,pickup_address,special_instructions)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """, (
                         user["id"], donor_name, org_name, contact, food_type, food_category,
                         quantity, quantity_unit, prep_time, pickup_address, special
                     ))
-                    conn.commit()
-                    conn.close()
                     st.success("Donation submitted. Organization will coordinate pickup.")
 
     with tab2:
-        conn = get_conn()
-        rows = conn.execute(
-            "SELECT * FROM food_donations WHERE donor_id=? ORDER BY created_at DESC",
+        rows = fetch_all(
+            "SELECT * FROM food_donations WHERE donor_id=%s ORDER BY created_at DESC",
             (user["id"],)
-        ).fetchall()
-        conn.close()
+        )
 
         if not rows:
             st.info("No donations yet. Submit your first one.")
@@ -494,7 +485,7 @@ def dashboard_donor():
                 st.write(row["food_type"] + " / " + row["food_category"])
                 st.write("Quantity:", row["quantity"], row["quantity_unit"])
                 st.write("Pickup:", row["pickup_address"])
-                st.caption("Created at: " + row["created_at"])
+                st.caption("Created at: " + str(row["created_at"]))
 
 
 def dashboard_ngo():
@@ -532,29 +523,24 @@ def dashboard_ngo():
                 if not ngo_name or not contact_person or not ngo_address or quantity_needed <= 0:
                     st.error(T("fill_required"))
                 else:
-                    conn = get_conn()
-                    conn.execute("""
+                    execute_commit("""
                     INSERT INTO ngo_demands
                     (ngo_id,ngo_name,contact_person,contact,email,ngo_address,service_area,
                      max_capacity,storage_available,food_type_needed,quantity_needed,
                      quantity_unit,priority,remarks)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     """, (
                         user["id"], ngo_name, contact_person, contact, email, ngo_address,
                         service_area, max_capacity, storage, food_needed, quantity_needed,
                         quantity_unit, priority, remarks
                     ))
-                    conn.commit()
-                    conn.close()
                     st.success("Demand posted. Organization will review and match.")
 
     with tab2:
-        conn = get_conn()
-        rows = conn.execute(
-            "SELECT * FROM ngo_demands WHERE ngo_id=? ORDER BY created_at DESC",
+        rows = fetch_all(
+            "SELECT * FROM ngo_demands WHERE ngo_id=%s ORDER BY created_at DESC",
             (user["id"],)
-        ).fetchall()
-        conn.close()
+        )
 
         if not rows:
             st.info("No demands posted yet.")
@@ -567,16 +553,14 @@ def dashboard_ngo():
                 st.write("Priority:", row["priority"])
                 show_status(row["status"])
                 st.write("Address:", row["ngo_address"])
-                st.caption("Created at: " + row["created_at"])
+                st.caption("Created at: " + str(row["created_at"]))
 
     with tab3:
-        conn = get_conn()
-        rows = conn.execute("""
+        rows = fetch_all("""
         SELECT * FROM food_donations
-        WHERE matched_ngo_id=? AND status IN ('matched','assigned')
+        WHERE matched_ngo_id=%s AND status IN ('matched','assigned')
         ORDER BY created_at DESC
-        """, (user["id"],)).fetchall()
-        conn.close()
+        """, (user["id"],))
 
         if not rows:
             st.info("No matched donations yet.")
@@ -590,12 +574,10 @@ def dashboard_ngo():
                 st.write("Pickup:", row["pickup_address"])
                 st.write("Time:", row["prep_time"])
 
-                conn = get_conn()
-                existing = conn.execute(
-                    "SELECT * FROM ngo_responses WHERE ngo_id=? AND donation_id=?",
+                existing = fetch_one(
+                    "SELECT * FROM ngo_responses WHERE ngo_id=%s AND donation_id=%s",
                     (user["id"], row["id"])
-                ).fetchone()
-                conn.close()
+                )
 
                 if existing:
                     st.success("Response submitted")
@@ -615,16 +597,13 @@ def dashboard_ngo():
                             submitted = st.form_submit_button("Submit Response")
 
                             if submitted:
-                                conn = get_conn()
-                                conn.execute("""
+                                execute_commit("""
                                 INSERT INTO ngo_responses
                                 (ngo_id,donation_id,action,quantity_accepted,preferred_pickup_time,priority,remarks)
-                                VALUES (?,?,?,?,?,?,?)
+                                VALUES (%s,%s,%s,%s,%s,%s,%s)
                                 """, (
                                     user["id"], row["id"], action, qty, pickup_time, priority, remarks
                                 ))
-                                conn.commit()
-                                conn.close()
                                 st.success("Response submitted")
                                 st.rerun()
 
@@ -685,23 +664,23 @@ def dashboard_organization():
                 key = "approve_" + str(donation["id"]) + "_" + str(demand["id"])
                 if st.button("✅ Approve Match", key=key):
                     conn = get_conn()
-                    conn.execute(
-                        "UPDATE food_donations SET status='matched', matched_ngo_id=? WHERE id=?",
+                    cur = conn.cursor()
+                    cur.execute(
+                        "UPDATE food_donations SET status='matched', matched_ngo_id=%s WHERE id=%s",
                         (demand["ngo_id"], donation["id"])
                     )
-                    conn.execute(
-                        "UPDATE ngo_demands SET status='matched', matched_donation_id=? WHERE id=?",
+                    cur.execute(
+                        "UPDATE ngo_demands SET status='matched', matched_donation_id=%s WHERE id=%s",
                         (donation["id"], demand["id"])
                     )
                     conn.commit()
+                    cur.close()
                     conn.close()
                     st.success("Match approved.")
                     st.rerun()
 
     with tab2:
-        conn = get_conn()
-        rows = conn.execute("SELECT * FROM food_donations ORDER BY created_at DESC").fetchall()
-        conn.close()
+        rows = fetch_all("SELECT * FROM food_donations ORDER BY created_at DESC")
 
         if not rows:
             st.info("No donations found.")
@@ -716,9 +695,7 @@ def dashboard_organization():
                 st.write("Contact:", row["contact"])
 
     with tab3:
-        conn = get_conn()
-        rows = conn.execute("SELECT * FROM ngo_demands ORDER BY created_at DESC").fetchall()
-        conn.close()
+        rows = fetch_all("SELECT * FROM ngo_demands ORDER BY created_at DESC")
 
         if not rows:
             st.info("No NGO demands found.")
@@ -738,22 +715,20 @@ def dashboard_organization():
 
 
 def volunteer_tab():
-    conn = get_conn()
-    matched_donations = conn.execute("""
+    matched_donations = fetch_all("""
     SELECT fd.*, u.full_name as ngo_name
     FROM food_donations fd
     LEFT JOIN users u ON fd.matched_ngo_id = u.id
     WHERE fd.status='matched' AND fd.assigned_volunteer_id IS NULL
-    """).fetchall()
-    volunteers = conn.execute("SELECT * FROM users WHERE role='volunteer'").fetchall()
-    assignments = conn.execute("""
+    """)
+    volunteers = fetch_all("SELECT * FROM users WHERE role='volunteer'")
+    assignments = fetch_all("""
     SELECT va.*, u.full_name as volunteer_name, fd.org_name, fd.pickup_address
     FROM volunteer_assignments va
     JOIN users u ON va.volunteer_id = u.id
     JOIN food_donations fd ON va.donation_id = fd.id
     ORDER BY va.created_at DESC
-    """).fetchall()
-    conn.close()
+    """)
 
     st.subheader("Assign Volunteers to Matched Donations")
 
@@ -785,10 +760,11 @@ def volunteer_tab():
                         volunteer_id = volunteer_ids[index]
 
                         conn = get_conn()
-                        conn.execute("""
+                        cur = conn.cursor()
+                        cur.execute("""
                         INSERT INTO volunteer_assignments
                         (volunteer_id,donation_id,pickup_location,drop_location,assigned_time)
-                        VALUES (?,?,?,?,?)
+                        VALUES (%s,%s,%s,%s,%s)
                         """, (
                             volunteer_id,
                             donation["id"],
@@ -796,11 +772,12 @@ def volunteer_tab():
                             drop_location,
                             assigned_time
                         ))
-                        conn.execute(
-                            "UPDATE food_donations SET assigned_volunteer_id=?, status='assigned' WHERE id=?",
+                        cur.execute(
+                            "UPDATE food_donations SET assigned_volunteer_id=%s, status='assigned' WHERE id=%s",
                             (volunteer_id, donation["id"])
                         )
                         conn.commit()
+                        cur.close()
                         conn.close()
                         st.success("Volunteer assigned.")
                         st.rerun()
@@ -831,17 +808,15 @@ def dashboard_volunteer():
     tab1, tab2 = st.tabs(["📦 My Assignments", "👤 My Profile"])
 
     with tab1:
-        conn = get_conn()
-        rows = conn.execute("""
+        rows = fetch_all("""
         SELECT va.*, fd.org_name, fd.food_type, fd.food_category, fd.quantity,
                fd.quantity_unit, fd.prep_time, fd.special_instructions,
                fd.pickup_address as donation_pickup
         FROM volunteer_assignments va
         JOIN food_donations fd ON va.donation_id = fd.id
-        WHERE va.volunteer_id=?
+        WHERE va.volunteer_id=%s
         ORDER BY va.created_at DESC
-        """, (user["id"],)).fetchall()
-        conn.close()
+        """, (user["id"],))
 
         if not rows:
             st.info("No assignments yet. The Organization will assign pickups to you.")
@@ -877,18 +852,20 @@ def dashboard_volunteer():
 
                             if submitted:
                                 conn = get_conn()
-                                conn.execute(
-                                    "UPDATE volunteer_assignments SET delivery_status=?, remarks=? WHERE id=?",
+                                cur = conn.cursor()
+                                cur.execute(
+                                    "UPDATE volunteer_assignments SET delivery_status=%s, remarks=%s WHERE id=%s",
                                     (new_status, remarks, row["id"])
                                 )
 
                                 if new_status == "Delivered":
-                                    conn.execute(
-                                        "UPDATE food_donations SET status='delivered' WHERE id=?",
+                                    cur.execute(
+                                        "UPDATE food_donations SET status='delivered' WHERE id=%s",
                                         (row["donation_id"],)
                                     )
 
                                 conn.commit()
+                                cur.close()
                                 conn.close()
                                 st.success("Status updated.")
                                 st.rerun()
@@ -949,5 +926,4 @@ elif page == "dashboard_volunteer":
         go("auth")
 else:
     go("home")
-
 
