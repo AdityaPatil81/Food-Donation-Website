@@ -1,4 +1,8 @@
 streamlit
-pandas
-twilio
+flask
+gunicorn
 mysql-connector-python
+pandas
+numpy
+joblib
+scikit-learn
