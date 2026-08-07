@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 import mysql.connector
+import os
 
 app = Flask(__name__)
 
@@ -27,7 +28,9 @@ def upload():
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
         database=os.getenv("DB_NAME"),
-        ssl_ca="isrgrootx1.pem"
+        ssl_ca="isrgrootx1.pem",
+        ssl_verify_cert=True,
+        ssl_verify_identity=True
     )
 
     cursor = conn.cursor()
