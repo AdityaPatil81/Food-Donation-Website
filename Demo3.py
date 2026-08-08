@@ -910,6 +910,9 @@ def volunteer_tab():
 
 def spoilage_detection():
 
+    if st.button("⬅️ Back to Home"):
+        go("home")
+    
     st.header("🍎 Food Spoilage Detection")
     st.write("Latest sensor data received from ESP32")
 
