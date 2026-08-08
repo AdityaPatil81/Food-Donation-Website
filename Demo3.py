@@ -7,6 +7,9 @@ import pandas as pd
 veg_model = joblib.load("veg_model.pkl")
 nonveg_model = joblib.load("nonveg_model.pkl")
 
+st.write("VEG MODEL FEATURES:", veg_model.feature_names_in_)
+st.write("NON-VEG MODEL FEATURES:", nonveg_model.feature_names_in_)
+
 try:
     TIDB_SECRETS = st.secrets.get("tidb", {})
 except Exception:
