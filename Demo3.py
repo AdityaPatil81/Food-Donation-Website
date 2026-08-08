@@ -38,10 +38,12 @@ class MySQLConnection:
 
     def execute(self, query, params=None):
         cur = self.conn.cursor(dictionary=True)
-        try:
-            cur.execute(query, params or ())
-        except mysql.connector.Error as e:
-            st.error(e)
+
+        if params is None:
+            cur.execute(query)
+        else:
+            cur.execute(query, params)
+
         return cur
 
     def cursor(self, *args, **kwargs):
@@ -55,14 +57,12 @@ class MySQLConnection:
 
 
 def get_conn():
-    try:
-        return MySQLConnection(
-            mysql.connector.connect(**MYSQL_CONFIG)
+    return MySQLConnection(
+        mysql.connector.connect(
+            **MYSQL_CONFIG,
+            use_pure=True
         )
-    except mysql.connector.Error as err:
-        st.error(f"Database Connection Error: {err}")
-        st.stop()
-
+    )
 
 def init_db():
     conn = get_conn()
