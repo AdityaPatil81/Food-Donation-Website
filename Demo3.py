@@ -912,63 +912,91 @@ def spoilage_detection():
 
     if st.button("⬅️ Back to Home"):
         go("home")
-    
+
     st.header("🍎 Food Spoilage Detection")
-    st.write("Latest sensor data received from ESP32")
-
-    conn = get_conn()
-
-    try:
-        data = conn.execute("""
-            SELECT *
-            FROM iotparameters
-            ORDER BY id DESC
-            LIMIT 1
-        """).fetchone()
-
-    except mysql.connector.Error as e:
-        st.error(f"Database Error: {e}")
-        conn.close()
-        return
-
-    finally:
-        conn.close()
-
-    if not data:
-        st.warning("No sensor data available.")
-        return
-
-    st.subheader("📡 Latest Sensor Values")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    col1.metric("Temperature", f"{data['temperature']:.2f} °C")
-    col2.metric("Humidity", f"{data['humidity']:.2f} %")
-    col3.metric("CO₂", f"{data['CO2']:.2f}")
-    col4.metric("VOC", f"{data['VOC']:.2f}")
-
-    col5, col6, col7, col8 = st.columns(4)
-
-    col5.metric("Ethanol", f"{data['ethanol']:.2f}")
-    col6.metric("Ethylene", f"{data['ethylene']:.2f}")
-    col7.metric("NH₃", f"{data['NH3']:.2f}")
-    col8.metric("H₂S", f"{data['H2S']:.2f}")
-
-    st.divider()
 
     food_type = st.selectbox(
         "Select Food Type",
         ["Vegetarian", "Non-Vegetarian"]
     )
 
-    if food_type == "Vegetarian":
+    @st.fragment(run_every=3)
+    def live_detection():
 
-        st.subheader("🥦 Vegetarian Food Prediction")
+        conn = get_conn()
 
-        if st.button(
-            "🔍 Predict Vegetarian Food",
-            use_container_width=True
-        ):
+        try:
+            data = conn.execute("""
+                SELECT *
+                FROM iotparameters
+                ORDER BY id DESC
+                LIMIT 1
+            """).fetchone()
+
+        except mysql.connector.Error as e:
+            st.error(f"Database Error: {e}")
+            return
+
+        finally:
+            conn.close()
+
+        if not data:
+            st.warning("No sensor data available.")
+            return
+
+        st.subheader("📡 Live Sensor Values")
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        col1.metric(
+            "Temperature",
+            f"{data['temperature']:.2f} °C"
+        )
+
+        col2.metric(
+            "Humidity",
+            f"{data['humidity']:.2f} %"
+        )
+
+        col3.metric(
+            "CO₂",
+            f"{data['CO2']:.2f}"
+        )
+
+        col4.metric(
+            "VOC",
+            f"{data['VOC']:.2f}"
+        )
+
+        col5, col6, col7, col8 = st.columns(4)
+
+        col5.metric(
+            "Ethanol",
+            f"{data['ethanol']:.2f}"
+        )
+
+        col6.metric(
+            "Ethylene",
+            f"{data['ethylene']:.2f}"
+        )
+
+        col7.metric(
+            "NH₃",
+            f"{data['NH3']:.2f}"
+        )
+
+        col8.metric(
+            "H₂S",
+            f"{data['H2S']:.2f}"
+        )
+
+        st.divider()
+
+        st.caption(
+            "Last Record ID: " + str(data["id"])
+        )
+
+        if food_type == "Vegetarian":
 
             sample = pd.DataFrame(
                 [[
@@ -994,6 +1022,8 @@ def spoilage_detection():
             try:
                 prediction = veg_model.predict(sample)[0]
 
+                st.subheader("🤖 Prediction")
+
                 if prediction == 0:
                     st.success("🟢 FRESH FOOD")
                 else:
@@ -1001,15 +1031,7 @@ def spoilage_detection():
 
             except Exception as e:
                 st.error(f"Prediction Error: {e}")
-
-    else:
-
-        st.subheader("🍗 Non-Vegetarian Food Prediction")
-
-        if st.button(
-            "🔍 Predict Non-Vegetarian Food",
-            use_container_width=True
-        ):
+        else:
 
             sample = pd.DataFrame(
                 [[
@@ -1033,6 +1055,8 @@ def spoilage_detection():
             try:
                 prediction = nonveg_model.predict(sample)[0]
 
+                st.subheader("🤖 Prediction")
+
                 if prediction == 0:
                     st.success("🟢 FRESH FOOD")
                 else:
@@ -1041,6 +1065,7 @@ def spoilage_detection():
             except Exception as e:
                 st.error(f"Prediction Error: {e}")
 
+    live_detection()
 
 def dashboard_volunteer():
     user = st.session_state.user
