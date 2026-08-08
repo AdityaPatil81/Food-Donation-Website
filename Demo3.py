@@ -514,15 +514,32 @@ def dashboard_donor():
                 else:
                     conn = get_conn()
                     try:
-                        conn.execute(...)
+                        conn.execute("""
+                            INSERT INTO food_donations
+                            (donor_id, donor_name, org_name, contact, food_type, food_category,
+                             quantity, quantity_unit, prep_time, pickup_address, special_instructions)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """, (
+                            user["id"],
+                            donor_name,
+                            org_name,
+                            contact,
+                            food_type,
+                            food_category,
+                            quantity,
+                            quantity_unit,
+                            prep_time,
+                            pickup_address,
+                            special
+                        ))
+
                         conn.commit()
-                        st.success(...)
+                        st.success("Donation submitted. Organization will coordinate pickup.")
                     except mysql.connector.Error as e:
                         st.error(f"Database Error: {e}")
                     finally:
                         conn.close()
-                    st.success("Donation submitted. Organization will coordinate pickup.")
-
+                    
     with tab2:
         conn = get_conn()
         rows = conn.execute(
