@@ -415,6 +415,11 @@ def page_home():
     m3.metric("Matched", db_count("food_donations", "status='matched'"))
     m4.metric("Deliveries", db_count("volunteer_assignments"))
 
+    st.divider()
+
+    if st.button("🍎 Food Spoilage Detection", use_container_width=True):
+        go("spoilage")
+
 
 def page_auth():
     role = st.session_state.role
