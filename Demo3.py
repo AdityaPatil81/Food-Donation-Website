@@ -984,7 +984,7 @@ def spoilage_detection():
                     "Temperature",
                     "Humidity",
                     "CO2",
-                    "VOC",
+                    "VOCs",
                     "Ethanol",
                     "Ethylene",
                     "NH3"
@@ -1026,7 +1026,7 @@ def spoilage_detection():
                     "NH3",
                     "H2S",
                     "CO2",
-                    "VOC"
+                    "VOCs"
                 ]
             )
 
