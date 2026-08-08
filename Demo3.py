@@ -1,7 +1,11 @@
 import streamlit as st
 import os
 import mysql.connector
+import joblib
+import pandas as pd
 
+veg_model = joblib.load("veg_model.pkl")
+nonveg_model = joblib.load("nonveg_model.pkl")
 
 try:
     TIDB_SECRETS = st.secrets.get("tidb", {})
@@ -899,6 +903,137 @@ def volunteer_tab():
             st.write("Time:", assignment["assigned_time"])
 
 
+def spoilage_detection():
+
+    st.header("🍎 Food Spoilage Detection")
+    st.write("Latest sensor data received from ESP32")
+
+    conn = get_conn()
+
+    try:
+        data = conn.execute("""
+            SELECT *
+            FROM iotparameters
+            ORDER BY id DESC
+            LIMIT 1
+        """).fetchone()
+
+    except mysql.connector.Error as e:
+        st.error(f"Database Error: {e}")
+        conn.close()
+        return
+
+    finally:
+        conn.close()
+
+    if not data:
+        st.warning("No sensor data available.")
+        return
+
+    st.subheader("📡 Latest Sensor Values")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("Temperature", f"{data['temperature']:.2f} °C")
+    col2.metric("Humidity", f"{data['humidity']:.2f} %")
+    col3.metric("CO₂", f"{data['CO2']:.2f}")
+    col4.metric("VOC", f"{data['VOC']:.2f}")
+
+    col5, col6, col7, col8 = st.columns(4)
+
+    col5.metric("Ethanol", f"{data['ethanol']:.2f}")
+    col6.metric("Ethylene", f"{data['ethylene']:.2f}")
+    col7.metric("NH₃", f"{data['NH3']:.2f}")
+    col8.metric("H₂S", f"{data['H2S']:.2f}")
+
+    st.divider()
+
+    food_type = st.selectbox(
+        "Select Food Type",
+        ["Vegetarian", "Non-Vegetarian"]
+    )
+
+    if food_type == "Vegetarian":
+
+        st.subheader("🥦 Vegetarian Food Prediction")
+
+        if st.button(
+            "🔍 Predict Vegetarian Food",
+            use_container_width=True
+        ):
+
+            sample = pd.DataFrame(
+                [[
+                    data["temperature"],
+                    data["humidity"],
+                    data["CO2"],
+                    data["VOC"],
+                    data["ethanol"],
+                    data["ethylene"],
+                    data["NH3"]
+                ]],
+                columns=[
+                    "Temperature",
+                    "Humidity",
+                    "CO2",
+                    "VOCs",
+                    "Ethanol",
+                    "Ethylene",
+                    "NH3"
+                ]
+            )
+
+            try:
+                prediction = veg_model.predict(sample)[0]
+
+                if prediction == 0:
+                    st.success("🟢 FRESH FOOD")
+                else:
+                    st.error("🔴 SPOILED FOOD")
+
+            except Exception as e:
+                st.error(f"Prediction Error: {e}")
+
+    else:
+
+        st.subheader("🍗 Non-Vegetarian Food Prediction")
+
+        if st.button(
+            "🔍 Predict Non-Vegetarian Food",
+            use_container_width=True
+        ):
+
+            sample = pd.DataFrame(
+                [[
+                    data["temperature"],
+                    data["humidity"],
+                    data["NH3"],
+                    data["H2S"],
+                    data["CO2"],
+                    data["VOC"]
+                ]],
+                columns=[
+                    "Temperature",
+                    "Humidity",
+                    "NH3",
+                    "H2S",
+                    "CO2",
+                    "VOC"
+                ]
+            )
+
+            try:
+                prediction = nonveg_model.predict(sample)[0]
+
+                if prediction == 0:
+                    st.success("🟢 FRESH FOOD")
+                else:
+                    st.error("🔴 SPOILED FOOD")
+
+            except Exception as e:
+                st.error(f"Prediction Error: {e}")
+
+
 def dashboard_volunteer():
     user = st.session_state.user
     show_logo()
@@ -1002,6 +1137,8 @@ if page == "home":
     page_home()
 elif page == "auth":
     page_auth()
+elif page == "spoilage":
+    spoilage_detection()
 elif page == "dashboard_donor":
     if st.session_state.user:
         dashboard_donor()
