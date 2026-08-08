@@ -1,7 +1,7 @@
 streamlit
 flask
 gunicorn
-mysql-connector-python
+mysql-connector-python>=9.5.0
 pandas
 numpy
 joblib
