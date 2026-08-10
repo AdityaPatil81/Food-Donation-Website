@@ -367,7 +367,43 @@ def T(key):
     if key in TEXT[lang]:
         return TEXT[lang][key]
     return TEXT["English"].get(key, key)
+    
+def enter_as(role):
+    lang = st.session_state.lang
 
+    roles = {
+        "English": {
+            "Donor": "Donor",
+            "Organization": "Organization",
+            "NGO": "NGO",
+            "Volunteer": "Volunteer"
+        },
+
+        "मराठी": {
+            "Donor": "अन्नदाता",
+            "Organization": "संस्था",
+            "NGO": "NGO",
+            "Volunteer": "स्वयंसेवक"
+        },
+
+        "हिंदी": {
+            "Donor": "अन्नदाता",
+            "Organization": "संस्था",
+            "NGO": "NGO",
+            "Volunteer": "स्वयंसेवक"
+        }
+    }
+
+    translated_role = roles[lang][role]
+
+    if lang == "English":
+        return "Enter as " + translated_role
+
+    elif lang == "मराठी":
+        return translated_role + " म्हणून प्रवेश करा"
+
+    elif lang == "हिंदी":
+        return translated_role + " के रूप में प्रवेश करें"
 
 def page_home():
     lang = st.selectbox("Language", ["English", "मराठी", "हिंदी"])
@@ -382,28 +418,28 @@ def page_home():
     with col1:
         st.subheader("🍽️ Food Donors")
         st.caption("Hotels, restaurants and event organizers")
-        if st.button(T("enter_as") + " Donor", use_container_width=True):
+        if st.button(enter_as("Donor"), use_container_width=True):
             st.session_state.role = "donor"
             go("auth")
 
     with col2:
         st.subheader("🏢 Organizations")
         st.caption("Central coordination hub")
-        if st.button(T("enter_as") + " Organization", use_container_width=True):
+        if st.button(enter_as("Organization"), use_container_width=True):
             st.session_state.role = "organization"
             go("auth")
 
     with col3:
         st.subheader("🤝 NGOs")
         st.caption("Request and receive food donations")
-        if st.button(T("enter_as") + " NGO", use_container_width=True):
+        if st.button(enter_as("NGO"), use_container_width=True):
             st.session_state.role = "ngo"
             go("auth")
 
     with col4:
         st.subheader("🚴 Volunteers")
         st.caption("Pickup and delivery logistics")
-        if st.button(T("enter_as") + " Volunteer", use_container_width=True):
+        if st.button(enter_as("Volunteer"), use_container_width=True):
             st.session_state.role = "volunteer"
             go("auth")
 
