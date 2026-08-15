@@ -956,7 +956,7 @@ def spoilage_detection():
         ["Vegetarian", "Non-Vegetarian"]
     )
 
-    @st.fragment(run_every=3)
+    @st.fragment(run_every=4)
     def live_detection():
 
         conn = get_conn()
