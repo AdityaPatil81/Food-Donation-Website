@@ -236,7 +236,7 @@ IoT FeedBridge Team
         return True
 
     except Exception as e:
-        print("OTP email error:", e)
+        st.error(f"Email error: {e}")
         return False
 
 def send_welcome_email(receiver_email, full_name, role):
