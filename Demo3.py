@@ -3,6 +3,8 @@ import os
 import mysql.connector
 import joblib
 import pandas as pd
+import smtplib
+from email.message import EmailMessage
 
 veg_model = joblib.load("veg_model.pkl")
 nonveg_model = joblib.load("nonveg_model.pkl")
@@ -176,6 +178,47 @@ def register_user(username, password, role, full_name, contact, email):
     finally:
         conn.close()
 
+def send_welcome_email(receiver_email, full_name, role):
+    try:
+        sender_email = st.secrets["email"]["sender"]
+        sender_password = st.secrets["email"]["password"]
+
+        msg = EmailMessage()
+
+        msg["Subject"] = "Welcome to IoT FeedBridge 🌿"
+        msg["From"] = sender_email
+        msg["To"] = receiver_email
+
+        msg.set_content(f"""
+Hello {full_name},
+
+Welcome to IoT FeedBridge! 🌿
+
+Your account has been successfully created.
+
+Account Details:
+Name: {full_name}
+Role: {role.title()}
+Email: {receiver_email}
+
+You can now log in to the IoT FeedBridge platform.
+
+Thank you for joining us!
+
+Regards,
+IoT FeedBridge Team
+""")
+
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+
+        return True
+
+    except Exception as e:
+        print("Email error:", e)
+        return False
 
 def login_user(username, password, role):
     conn = get_conn()
@@ -514,7 +557,12 @@ def page_auth():
                     created = register_user(username, password, role, full_name, contact, email)
 
                     if created:
-                        st.success(T("reg_success"))
+                        email_sent = send_welcome_email(email,full_name,role)
+                        if email_sent:
+                            st.success("Registration successful! Welcome email sent to " + email)
+                        else:
+                            st.success(T("reg_success"))
+                            st.warning("Account created, but the welcome email could not be sent.")
                     else:
                         st.error(T("username_exists"))
 
