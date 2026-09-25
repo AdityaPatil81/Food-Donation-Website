@@ -3,7 +3,10 @@ import os
 import mysql.connector
 import joblib
 import pandas as pd
+import re
+import random
 import smtplib
+import time
 from email.message import EmailMessage
 
 veg_model = joblib.load("veg_model.pkl")
@@ -70,6 +73,10 @@ def get_conn():
         )
     )
 
+def is_valid_email(email):
+    pattern = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
+    return re.match(pattern, email) is not None
+
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
@@ -82,7 +89,7 @@ def init_db():
         role VARCHAR(50) NOT NULL,
         full_name VARCHAR(255),
         contact VARCHAR(50),
-        email VARCHAR(255),
+        email VARCHAR(255) UNIQUE NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -178,6 +185,60 @@ def register_user(username, password, role, full_name, contact, email):
     finally:
         conn.close()
 
+def email_exists(email):
+    conn = get_conn()
+
+    try:
+        row = conn.execute(
+            "SELECT id FROM users WHERE email=%s LIMIT 1",
+            (email,)
+        ).fetchone()
+
+        return row is not None
+
+    finally:
+        conn.close()
+
+def generate_otp():
+    return str(random.randint(100000, 999999))
+
+def send_otp_email(receiver_email, otp):
+    try:
+        sender_email = st.secrets["email"]["sender"]
+        sender_password = st.secrets["email"]["password"]
+
+        msg = EmailMessage()
+
+        msg["Subject"] = "IoT FeedBridge - Email Verification"
+        msg["From"] = sender_email
+        msg["To"] = receiver_email
+
+        msg.set_content(f"""
+Hello,
+
+Your IoT FeedBridge email verification code is:
+
+{otp}
+
+This OTP is valid for 5 minutes.
+
+If you did not try to register on IoT FeedBridge, you can ignore this email.
+
+Regards,
+IoT FeedBridge Team
+""")
+
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+
+        return True
+
+    except Exception as e:
+        print("OTP email error:", e)
+        return False
+
 def send_welcome_email(receiver_email, full_name, role):
     try:
         sender_email = st.secrets["email"]["sender"]
@@ -197,9 +258,12 @@ Welcome to IoT FeedBridge! 🌿
 Your account has been successfully created.
 
 Account Details:
+
 Name: {full_name}
 Role: {role.title()}
 Email: {receiver_email}
+
+Your email has been successfully verified.
 
 You can now log in to the IoT FeedBridge platform.
 
@@ -217,7 +281,7 @@ IoT FeedBridge Team
         return True
 
     except Exception as e:
-        print("Email error:", e)
+        print("Welcome email error:", e)
         return False
 
 def login_user(username, password, role):
@@ -285,6 +349,15 @@ def setup_session():
 
     if "lang" not in st.session_state:
         st.session_state.lang = "English"
+
+    if "registration_data" not in st.session_state:
+        st.session_state.registration_data = None
+
+    if "registration_otp" not in st.session_state:
+        st.session_state.registration_otp = None
+
+    if "otp_expiry" not in st.session_state:
+        st.session_state.otp_expiry = None
 
 
 def go(page_name):
@@ -535,36 +608,167 @@ def page_auth():
                     st.error(T("invalid_creds"))
 
     with tab2:
-        with st.form("register_form"):
-            full_name = st.text_input(T("full_name"))
-            contact = st.text_input(T("contact"))
-            email = st.text_input(T("email"))
-            email = email.strip()
-            username = st.text_input(T("choose_username"))
-            username = username.strip()
-            password = st.text_input(T("choose_password"), type="password")
-            confirm_password = st.text_input(T("confirm_password"), type="password")
-            submitted = st.form_submit_button(T("create_account"), use_container_width=True)
+        if st.session_state.registration_otp is not None:
+            st.info(
+                "A 6-digit verification code has been sent to "
+                + st.session_state.registration_data["email"]
+            )
+
+            otp_input = st.text_input(
+                "Enter 6-digit OTP",
+                max_chars=6
+            )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if st.button("Verify Email", use_container_width=True):
+
+                    if st.session_state.otp_expiry is None:
+                        st.error("OTP expired. Please register again.")
+
+                    elif time.time() > st.session_state.otp_expiry:
+                        st.error("OTP has expired. Please request a new OTP.")
+
+                    elif otp_input == st.session_state.registration_otp:
+
+                        data = st.session_state.registration_data
+
+                        created = register_user(
+                            data["username"],
+                            data["password"],
+                            data["role"],
+                            data["full_name"],
+                            data["contact"],
+                            data["email"]
+                        )
+
+                        if created:
+                            send_welcome_email(
+                                data["email"],
+                                data["full_name"],
+                                data["role"]
+                            )
+
+                            st.session_state.registration_otp = None
+                            st.session_state.otp_expiry = None
+                            st.session_state.registration_data = None
+
+                            st.success(
+                                "Email verified and account created successfully! "
+                                "Welcome email has been sent."
+                            )
+
+                        else:
+                            st.error(
+                                "Username already exists. Please try another username."
+                            )
+
+                    else:
+                        st.error("Invalid OTP. Please enter the correct code.")
+
+            with col2:
+                if st.button("Cancel Verification", use_container_width=True):
+
+                    st.session_state.registration_otp = None
+                    st.session_state.otp_expiry = None
+                    st.session_state.registration_data = None
+
+                    st.rerun()
+
+        else:
+
+            with st.form("register_form"):
+
+                full_name = st.text_input(T("full_name"))
+
+                contact = st.text_input(T("contact"))
+
+                email = st.text_input(T("email"))
+
+                email = email.strip().lower()
+
+                username = st.text_input(T("choose_username"))
+
+                username = username.strip()
+
+                password = st.text_input(
+                    T("choose_password"),
+                    type="password"
+                )
+
+                confirm_password = st.text_input(
+                    T("confirm_password"),
+                    type="password"
+                )
+
+                submitted = st.form_submit_button(
+                    T("create_account"),
+                    use_container_width=True
+                )
 
             if submitted:
-                if password != confirm_password:
-                    st.error(T("pwd_mismatch"))
-                elif not full_name or not contact or not username or not password:
-                    st.error(T("fill_required"))
-                elif len(contact)!=10:
-                    st.error("Enter valid contact number.")
-                else:
-                    created = register_user(username, password, role, full_name, contact, email)
 
-                    if created:
-                        email_sent = send_welcome_email(email,full_name,role)
-                        if email_sent:
-                            st.success("Registration successful! Welcome email sent to " + email)
-                        else:
-                            st.success(T("reg_success"))
-                            st.warning("Account created, but the welcome email could not be sent.")
+                if password != confirm_password:
+
+                    st.error(T("pwd_mismatch"))
+
+                elif not full_name or not contact or not username or not password or not email:
+
+                    st.error(T("fill_required"))
+
+                elif len(contact) != 10:
+
+                    st.error("Enter valid contact number.")
+
+                elif not is_valid_email(email):
+
+                    st.error("Please enter a valid email address.")
+
+                elif email_exists(email):
+
+                    st.error(
+                        "This email is already registered. "
+                        "Please use another email."
+                    )
+
+                else:
+                    otp = generate_otp()
+
+                    email_sent = send_otp_email(
+                        email,
+                        otp
+                    )
+
+                    if email_sent:
+                        st.session_state.registration_data = {
+                            "full_name": full_name,
+                            "contact": contact,
+                            "email": email,
+                            "username": username,
+                            "password": password,
+                            "role": role
+                        }
+
+                        st.session_state.registration_otp = otp
+
+                        st.session_state.otp_expiry = (
+                            time.time() + 300
+                        )
+
+                        st.success(
+                            "Verification code sent to "
+                            + email
+                        )
+
+                        st.rerun()
+
                     else:
-                        st.error(T("username_exists"))
+
+                        st.error(
+                            "Unable to send verification email. "
+                            "Please check your email address and try again."
+                        )
 
 
 def dashboard_donor():
