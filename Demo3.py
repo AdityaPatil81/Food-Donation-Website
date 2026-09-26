@@ -387,35 +387,15 @@ def find_matches():
 
             category_score = 0
 
-            donation_category = str(
-                donation["food_category"]
-            ).strip().lower()
+            donation_category = str(donation["food_category"]).strip().lower()
 
-            # If the NGO has a category field available,
-            # compare it with the donation category.
-            #
-            # For now, if the demand does not contain a
-            # food category, give a neutral score.
+            required_category = str(demand["food_category_needed"]).strip().lower()
 
-            if "food_category_needed" in demand.keys():
-
-                required_category = str(
-                    demand["food_category_needed"]
-                ).strip().lower()
-
-                if required_category == "":
-                    category_score = 7.5
-
-                elif donation_category == required_category:
-                    category_score = 15
-
-                else:
-                    category_score = 0
+            if donation_category == required_category:
+                category_score = 15
 
             else:
-                # Category requirement is not currently
-                # available in the NGO demand table.
-                category_score = 7.5
+                category_score = 0
 
 
 
@@ -1268,12 +1248,13 @@ def dashboard_ngo():
                                 max_capacity,
                                 storage_available,
                                 food_type_needed,
+                                food_category_needed,
                                 quantity_needed,
                                 quantity_unit,
                                 priority,
                                 remarks
                             )
-                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                         """, (
                             user["id"],
                             ngo_name,
@@ -1287,6 +1268,7 @@ def dashboard_ngo():
                             max_capacity,
                             storage,
                             food_needed,
+                            food_category_needed,
                             quantity_needed,
                             quantity_unit,
                             priority,
