@@ -673,7 +673,12 @@ def page_auth():
                         )
 
                         st.success(
-                            "OTP sent to " + email
+                            "📧 A verification code has been sent to your email address."
+                        )
+                        
+                        st.info(
+                            "Please check your email Inbox for the verification code. "
+                            "If you don't find it there, please check your Spam folder."
                         )
 
                         st.rerun()
