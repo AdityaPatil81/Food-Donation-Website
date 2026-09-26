@@ -796,8 +796,8 @@ def page_auth():
 
                     if welcome_sent:
                         st.success(
-                            "🎉 Account created successfully! "
-                            "Welcome email has been sent."
+                            "🎉 Your account has been created successfully! "
+                            "You can now proceed to the Login page and access your account."
                         )
 
                     else:
