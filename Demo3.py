@@ -1087,25 +1087,29 @@ def dashboard_donor():
                 prep_time_value = st.time_input("Time of Preparation")
 
             with col4:
-                pickup_address = st.text_area("Pickup Address")
+                pickup_address = st.text_area("Pickup Address",height=100)
 
+                st.divider()
                 st.markdown("### 📍 Pickup Location")
 
-                pickup_latitude = st.number_input(
-                    "Latitude",
-                    format="%.7f",
-                    key="donor_pickup_latitude"
-                )
-
-                pickup_longitude = st.number_input(
-                    "Longitude",
-                    format="%.7f",
-                    key="donor_pickup_longitude"
-                )
+                loc1, loc2 = st.columns(2)
+                with loc1:
+                    pickup_latitude = st.number_input(
+                        "Latitude",
+                        format="%.7f",
+                        key="donor_pickup_latitude"
+                    )
+                with loc2:
+                    pickup_longitude = st.number_input(
+                        "Longitude",
+                        format="%.7f",
+                        key="donor_pickup_longitude"
+                    )
 
                 special_instructions = st.text_area(
                     "Special Instructions",
-                    placeholder="Any special instructions for pickup..."
+                    placeholder="Any special instructions for pickup...",
+                    height=100
                 )
             submitted = st.form_submit_button("🚀 Submit Donation", use_container_width=True)
             prep_datetime = datetime.combine(prep_date,prep_time_value)
@@ -1209,21 +1213,25 @@ def dashboard_ngo():
                 email = st.text_input("Email ID", value=user["email"])
 
             with col2:
-                ngo_address = st.text_area("NGO Address")
+                ngo_address = st.text_area("NGO Address",height=100)
 
                 st.markdown("### 📍 NGO Location")
 
-                ngo_latitude = st.number_input(
-                    "Latitude",
-                    format="%.7f",
-                    key="ngo_latitude"
-                )
+                ngo_loc1, ngo_loc2 = st.columns(2)
 
-                ngo_longitude = st.number_input(
-                    "Longitude",
-                    format="%.7f",
-                    key="ngo_longitude"
-                )
+                with ngo_loc1:
+                    ngo_latitude = st.number_input(
+                        "Latitude",
+                        format="%.7f",
+                        key="ngo_latitude"
+                    )
+
+                with ngo_loc2:
+                    ngo_longitude = st.number_input(
+                        "Longitude",
+                        format="%.7f",
+                        key="ngo_longitude"
+                    )
 
                 service_area = st.text_input("Service Area")
                 max_capacity = st.number_input(
@@ -1236,10 +1244,21 @@ def dashboard_ngo():
                     ["Yes", "No"]
                 )
 
-            food_needed = st.selectbox("Food Type Needed", ["Veg", "Non-Veg", "Both"])
-            food_category_needed = st.selectbox("Food Category Needed",["Cooked", "Packaged", "Raw"])
-            quantity_needed = st.number_input("Quantity Needed", min_value=0.0, step=0.5)
-            quantity_unit = st.selectbox("Unit", ["Person-wise", "Kg"])
+            st.divider()
+            st.markdown("### 🍱 Food Requirements")
+            
+            food_col1, food_col2 = st.columns(2)
+            with food_col1:
+                food_needed = st.selectbox("Food Type Needed", ["Veg", "Non-Veg", "Both"])
+            with food_col2:
+                food_category_needed = st.selectbox("Food Category Needed",["Cooked", "Packaged", "Raw"])
+
+            qty_col1, qty_col2 = st.columns(2)
+            with qty_col1:
+                quantity_needed = st.number_input("Quantity Needed", min_value=0.0, step=0.5)
+            with qty_col2:
+                quantity_unit = st.selectbox("Unit", ["Person-wise", "Kg"])
+                
             priority = st.selectbox("Priority Level", ["High", "Medium", "Low"], index=1)
             remarks = st.text_area("Remarks")
             submitted = st.form_submit_button("📢 Post Food Demand", use_container_width=True)
