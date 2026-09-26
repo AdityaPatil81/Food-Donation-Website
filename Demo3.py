@@ -253,26 +253,26 @@ def send_welcome_email(receiver_email, full_name, role):
         msg["To"] = receiver_email
 
         msg.set_content(f"""
-Hello {full_name},
+            Hello {full_name},
 
-Welcome to IoT FeedBridge! 🌿
+            Welcome to IoT FeedBridge! 🌿
 
-Your account has been successfully created.
+            Your account has been successfully created.
 
-Account Details:
+            Account Details:
 
-Name: {full_name}
-Role: {role.title()}
-Email: {receiver_email}
+            Name: {full_name}
+            Role: {role.title()}
+            Email: {receiver_email}
 
-Your email has been successfully verified.
+            Your email has been successfully verified.
 
-You can now log in to the IoT FeedBridge platform.
+            You can now log in to the IoT FeedBridge platform.
 
-Thank you for joining us!
+            Thank you for joining us!
 
-Regards,
-IoT FeedBridge Team
+            Regards,
+            IoT FeedBridge Team
             """)
 
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
@@ -1433,19 +1433,19 @@ def dashboard_ngo():
                                                 donor_email,
                                                 "🤝 Donation Accepted - IoT FeedBridge",
                                                 f"""
-Hello {donor["full_name"]},
+                                                Hello {donor["full_name"]},
 
-Your food donation has been accepted by {user["full_name"]}.
+                                                Your food donation has been accepted by {user["full_name"]}.
 
-Food: {row["food_type"]} / {row["food_category"]}
-Quantity: {qty} {row["quantity_unit"]}
-Pickup Time: {pickup_time}
+                                                Food: {row["food_type"]} / {row["food_category"]}
+                                                Quantity: {qty} {row["quantity_unit"]}
+                                                Pickup Time: {pickup_time}
 
-Please log in to IoT FeedBridge for further updates.
+                                                Please log in to IoT FeedBridge for further updates.
 
-Regards,
-IoT FeedBridge Team
-"""
+                                                Regards,
+                                                IoT FeedBridge Team
+                                                """
                                             )
 
                                     st.success("Response submitted successfully.")
@@ -1549,24 +1549,26 @@ def dashboard_organization():
                             ngo_email,
                             "✅ Smart Match Approved - IoT FeedBridge",
                             f"""
-Hello {demand["ngo_name"]},
+                            Hello {demand["ngo_name"]},
 
-The Organization has approved a smart match for your NGO.
+                            Good news! 🎉
 
-Donation Details:
+                            The Organization has approved a smart match for your NGO.
 
-Food Type: {donation["food_type"]}
-Food Category: {donation["food_category"]}
-Quantity: {donation["quantity"]} {donation["quantity_unit"]}
-Donor: {donation["org_name"]}
+                            Donation Details:
 
-The donation is now available for your review.
+                            Food Type: {donation["food_type"]}
+                            Food Category: {donation["food_category"]}
+                            Quantity: {donation["quantity"]} {donation["quantity_unit"]}
+                            Donor: {donation["org_name"]}
 
-Please log in to the IoT FeedBridge platform and respond to the donation.
+                            The donation is now available for your review.
 
-Regards,
-IoT FeedBridge Team
-"""
+                            Please log in to the IoT FeedBridge platform and respond to the donation.
+
+                            Regards,
+                            IoT FeedBridge Team
+                            """
                         )
 
                         st.success("✅ Match approved and NGO has been notified.")
@@ -1708,21 +1710,21 @@ def volunteer_tab():
                                     volunteer["email"],
                                     "🚴 Pickup Assignment - IoT FeedBridge",
                                     f"""
-Hello {volunteer["full_name"]},
+                                    Hello {volunteer["full_name"]},
 
-You have been assigned a food donation pickup.
+                                    You have been assigned a food donation pickup.
 
-Food: {donation["food_type"]} / {donation["food_category"]}
-Quantity: {donation["quantity"]} {donation["quantity_unit"]}
-Pickup Location: {donation["pickup_address"]}
-Drop Location: {drop_location}
-Assigned Time: {assigned_time}
+                                    Food: {donation["food_type"]} / {donation["food_category"]}
+                                    Quantity: {donation["quantity"]} {donation["quantity_unit"]}
+                                    Pickup Location: {donation["pickup_address"]}
+                                    Drop Location: {drop_location}
+                                    Assigned Time: {assigned_time}
 
-Please log in to IoT FeedBridge for further details.
+                                    Please log in to IoT FeedBridge for further details.
 
-Regards,
-IoT FeedBridge Team
-"""
+                                    Regards,
+                                    IoT FeedBridge Team
+                                    """
                                 )
 
                             st.success("Volunteer assigned successfully.")
@@ -1968,20 +1970,105 @@ def dashboard_volunteer():
 
                             if submitted:
                                 conn = get_conn()
-                                conn.execute(
-                                    "UPDATE volunteer_assignments SET delivery_status=%s, remarks=%s WHERE id=%s",
-                                    (new_status, remarks, row["id"])
-                                )
 
-                                if new_status == "Delivered":
+                                try:
                                     conn.execute(
-                                        "UPDATE food_donations SET status='delivered' WHERE id=%s",
-                                        (row["donation_id"],)
+                                        """
+                                        UPDATE volunteer_assignments
+                                        SET delivery_status=%s, remarks=%s
+                                        WHERE id=%s
+                                        """,
+                                        (new_status, remarks, row["id"])
                                     )
 
-                                conn.commit()
-                                conn.close()
-                                st.success("Status updated.")
+                                    if new_status == "Delivered":
+
+                                        conn.execute(
+                                            """
+                                            UPDATE food_donations
+                                            SET status='delivered'
+                                            WHERE id=%s
+                                            """,
+                                            (row["donation_id"],)
+                                        )
+
+                                        donation_info = conn.execute(
+                                            """
+                                            SELECT
+                                                fd.org_name,
+                                                fd.food_type,
+                                                fd.food_category,
+                                                fd.quantity,
+                                                fd.quantity_unit,
+                                                fd.donor_id,
+                                                du.email AS donor_email,
+                                                du.full_name AS donor_name,
+                                                nu.email AS ngo_email,
+                                                nu.full_name AS ngo_name
+                                            FROM food_donations fd
+                                            LEFT JOIN users du ON fd.donor_id = du.id
+                                            LEFT JOIN users nu ON fd.matched_ngo_id = nu.id
+                                            WHERE fd.id=%s
+                                            """,
+                                            (row["donation_id"],)
+                                        ).fetchone()
+
+                                    conn.commit()
+
+                                    if new_status == "Delivered" and donation_info:
+
+                                        # Email to Donor
+                                        if donation_info["donor_email"]:
+
+                                            send_notification_email(
+                                                donation_info["donor_email"],
+                                                "📦 Delivery Completed - IoT FeedBridge",
+                                                f"""
+Hello {donation_info["donor_name"]},
+
+Your food donation has been successfully delivered to {donation_info["ngo_name"]}.
+
+Food: {donation_info["food_type"]} / {donation_info["food_category"]}
+Quantity: {donation_info["quantity"]} {donation_info["quantity_unit"]}
+
+Thank you for contributing to food redistribution.
+
+Regards,
+IoT FeedBridge Team
+"""
+                                            )
+
+                                        # Email to NGO
+                                        if donation_info["ngo_email"]:
+
+                                            send_notification_email(
+                                                donation_info["ngo_email"],
+                                                "📦 Delivery Completed - IoT FeedBridge",
+                                                f"""
+Hello {donation_info["ngo_name"]},
+
+The food donation from {donation_info["org_name"]} has been successfully delivered.
+
+Food: {donation_info["food_type"]} / {donation_info["food_category"]}
+Quantity: {donation_info["quantity"]} {donation_info["quantity_unit"]}
+
+Please log in to IoT FeedBridge for further details.
+
+Regards,
+IoT FeedBridge Team
+"""
+                                            )
+
+                                    st.success("Status updated successfully.")
+
+                                except mysql.connector.Error as e:
+
+                                    conn.rollback()
+                                    st.error(f"Database Error: {e}")
+
+                                finally:
+                                    conn.close()
+
                                 st.rerun()
 
     with tab2:
