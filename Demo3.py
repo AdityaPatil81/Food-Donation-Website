@@ -1060,7 +1060,7 @@ def dashboard_donor():
             with col3:
                 quantity = st.number_input("Quantity", min_value=0.0, step=0.5)
                 prep_date = st.date_input("Date of Preparation")
-                prep_time_value = st.time_input("Time of Preparation")
+                prep_time_value = st.time_input("Time of Preparation (24 Hr)")
 
             with col4:
                 pickup_address = st.text_area("Pickup Address")
