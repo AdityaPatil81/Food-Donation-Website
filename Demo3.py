@@ -253,27 +253,27 @@ def send_welcome_email(receiver_email, full_name, role):
         msg["To"] = receiver_email
 
         msg.set_content(f"""
-Hello {full_name},
+            Hello {full_name},
 
-Welcome to IoT FeedBridge! 🌿
+            Welcome to IoT FeedBridge! 🌿
 
-Your account has been successfully created.
+            Your account has been successfully created.
 
-Account Details:
+            Account Details:
 
-Name: {full_name}
-Role: {role.title()}
-Email: {receiver_email}
+            Name: {full_name}
+            Role: {role.title()}
+            Email: {receiver_email}
 
-Your email has been successfully verified.
+            Your email has been successfully verified.
 
-You can now log in to the IoT FeedBridge platform.
+            You can now log in to the IoT FeedBridge platform.
 
-Thank you for joining us!
+            Thank you for joining us!
 
-Regards,
-IoT FeedBridge Team
-""")
+            Regards,
+            IoT FeedBridge Team
+            """)
 
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
             server.starttls()
@@ -284,6 +284,30 @@ IoT FeedBridge Team
 
     except Exception as e:
         print("Welcome email error:", e)
+        return False
+
+def send_notification_email(receiver_email, subject, message):
+    try:
+        sender_email = st.secrets["email"]["sender"]
+        sender_password = st.secrets["email"]["password"]
+
+        msg = EmailMessage()
+
+        msg["Subject"] = subject
+        msg["From"] = sender_email
+        msg["To"] = receiver_email
+
+        msg.set_content(message)
+
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
+
+        return True
+
+    except Exception as e:
+        print("Notification email error:", e)
         return False
 
 def login_user(username, password, role):
@@ -1060,7 +1084,7 @@ def dashboard_donor():
             with col3:
                 quantity = st.number_input("Quantity", min_value=0.0, step=0.5)
                 prep_date = st.date_input("Date of Preparation")
-                prep_time_value = st.time_input("Time of Preparation (24 Hr)")
+                prep_time_value = st.time_input("Time of Preparation")
 
             with col4:
                 pickup_address = st.text_area("Pickup Address")
@@ -1393,6 +1417,25 @@ def dashboard_organization():
     with tab1:
         st.subheader("🤖 Smart Matches")
         matches = find_matches()
+
+        if st.button("📧 Test Notification Email"):
+            result = send_notification_email(
+        "feedbridge.team@gmail.com",
+        "Test Notification - IoT FeedBridge",
+        """Hello,
+
+This is a test notification from IoT FeedBridge.
+
+The notification email system is working successfully.
+
+Regards,
+IoT FeedBridge Team"""
+    )
+
+    if result:
+        st.success("✅ Test notification email sent!")
+    else:
+        st.error("❌ Failed to send notification email.")
 
         if not matches:
             st.info("No pending matches found.")
