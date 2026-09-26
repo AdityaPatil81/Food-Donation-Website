@@ -8,6 +8,7 @@ import random
 import smtplib
 import time
 from email.message import EmailMessage
+from math import radians, sin, cos, sqrt, atan2
 
 veg_model = joblib.load("veg_model.pkl")
 nonveg_model = joblib.load("nonveg_model.pkl")
@@ -306,6 +307,28 @@ def db_count(table, where_text="1=1"):
     conn.close()
     return row[0]
 
+def calculate_distance(lat1, lon1, lat2, lon2):
+
+    R = 6371.0  # Earth's radius in kilometers
+
+    lat1 = radians(float(lat1))
+    lon1 = radians(float(lon1))
+    lat2 = radians(float(lat2))
+    lon2 = radians(float(lon2))
+
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = (
+        sin(dlat / 2) ** 2
+        + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    )
+
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    distance = R * c
+
+    return distance
 
 def find_matches():
     conn = get_conn()
@@ -325,15 +348,39 @@ def find_matches():
             if donation["quantity"] >= demand["quantity_needed"]:
                 score = score + 2
 
+            distance = None
+            donation_lat = donation["pickup_latitude"]
+            donation_lon = donation["pickup_longitude"]
+
+            ngo_lat = demand["ngo_latitude"]
+            ngo_lon = demand["ngo_longitude"]
+
+            if (
+                donation_lat is not None
+                and donation_lon is not None
+                and ngo_lat is not None
+                and ngo_lon is not None
+            ):
+                try:
+                    distance = calculate_distance(
+                        donation_lat,
+                        donation_lon,
+                        ngo_lat,
+                        ngo_lon
+                    )
+                except (ValueError, TypeError):
+                    distance = None
+
             if score >= 2:
                 item = {
                     "donation": dict(donation),
                     "demand": dict(demand),
-                    "score": score
+                    "score": score,
+                    "distance": distance
                 }
                 matches.append(item)
 
-    matches.sort(key=lambda item: item["score"], reverse=True)
+    matches.sort(key=lambda item: (-item["score"], item["distance"] if item["distance"] is not None else float("inf")))
     return matches
 
 
@@ -855,10 +902,39 @@ def dashboard_donor():
             with col4:
                 pickup_address = st.text_area("Pickup Address")
 
-            special = st.text_area("Special Instructions")
+                st.markdown("### 📍 Pickup Location")
+
+                pickup_latitude = st.number_input(
+                    "Latitude",
+                    format="%.7f",
+                    key="donor_pickup_latitude"
+                )
+
+                pickup_longitude = st.number_input(
+                    "Longitude",
+                    format="%.7f",
+                    key="donor_pickup_longitude"
+                )
+
+                special_instructions = st.text_area(
+                    "Special Instructions",
+                    placeholder="Any special instructions for pickup..."
+                )
             submitted = st.form_submit_button("🚀 Submit Donation", use_container_width=True)
 
             if submitted:
+                if pickup_latitude == 0 or pickup_longitude == 0:
+                    st.error("📍 Please enter your pickup location coordinates.")
+                    st.stop()
+
+                if not (-90 <= pickup_latitude <= 90):
+                    st.error("❌ Invalid latitude. Latitude must be between -90 and 90.")
+                    st.stop()
+
+                if not (-180 <= pickup_longitude <= 180):
+                    st.error("❌ Invalid longitude. Longitude must be between -180 and 180.")
+                    st.stop()
+
                 if not donor_name or not org_name or quantity <= 0 or not pickup_address:
                     st.error(T("fill_required"))
                 else:
@@ -866,22 +942,37 @@ def dashboard_donor():
                     try:
                         conn.execute("""
                             INSERT INTO food_donations
-                            (donor_id, donor_name, org_name, contact, food_type, food_category,
-                             quantity, quantity_unit, prep_time, pickup_address, special_instructions)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            (
+                                donor_id,
+                                donor_name,
+                                org_name,
+                                contact,
+                                food_type,
+                                food_category,
+                                quantity,
+                                quantity_unit,
+                                prep_time,
+                                pickup_address,
+                                pickup_latitude,
+                                pickup_longitude,
+                                special_instructions
+                            )
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                         """, (
-                            user["id"],
-                            donor_name,
-                            org_name,
-                            contact,
-                            food_type,
-                            food_category,
-                            quantity,
-                            quantity_unit,
-                            prep_time,
-                            pickup_address,
-                            special
-                        ))
+                                user["id"],
+                                user["full_name"],
+                                org_name,
+                                contact,
+                                food_type,
+                                food_category,
+                                quantity,
+                                quantity_unit,
+                                prep_time,
+                                pickup_address,
+                                pickup_latitude,
+                                pickup_longitude,
+                                special_instructions
+                            ))
 
                         conn.commit()
                         st.success("Donation submitted. Organization will coordinate pickup.")
@@ -931,9 +1022,31 @@ def dashboard_ngo():
 
             with col2:
                 ngo_address = st.text_area("NGO Address")
+
+                st.markdown("### 📍 NGO Location")
+
+                ngo_latitude = st.number_input(
+                    "Latitude",
+                    format="%.7f",
+                    key="ngo_latitude"
+                )
+
+                ngo_longitude = st.number_input(
+                    "Longitude",
+                    format="%.7f",
+                    key="ngo_longitude"
+                )
+
                 service_area = st.text_input("Service Area")
-                max_capacity = st.number_input("Maximum Capacity", min_value=0, step=10)
-                storage = st.selectbox("Storage Facility Available", ["Yes", "No"])
+                max_capacity = st.number_input(
+                    "Maximum Capacity",
+                    min_value=0,
+                    step=10
+                )
+                storage = st.selectbox(
+                    "Storage Facility Available",
+                    ["Yes", "No"]
+                )
 
             food_needed = st.selectbox("Food Type Needed", ["Veg", "Non-Veg", "Both"])
             quantity_needed = st.number_input("Quantity Needed", min_value=0.0, step=0.5)
@@ -945,6 +1058,12 @@ def dashboard_ngo():
             if submitted:
                 if not ngo_name or not contact_person or not ngo_address or quantity_needed <= 0:
                     st.error(T("fill_required"))
+                elif ngo_latitude == 0 or ngo_longitude == 0:
+                    st.error("📍 Please enter the NGO location coordinates.")
+                elif not (-90 <= ngo_latitude <= 90):
+                    st.error("❌ Invalid latitude. Latitude must be between -90 and 90.")
+                elif not (-180 <= ngo_longitude <= 180):
+                    st.error("❌ Invalid longitude. Longitude must be between -180 and 180.")
                 elif len(contact) != 10:
                     st.error("Enter valid contact number.")
                 elif "@" not in email:
@@ -954,14 +1073,42 @@ def dashboard_ngo():
                     try:
                         conn.execute("""
                             INSERT INTO ngo_demands
-                            (ngo_id,ngo_name,contact_person,contact,email,ngo_address,service_area,
-                            max_capacity,storage_available,food_type_needed,quantity_needed,
-                            quantity_unit,priority,remarks)
-                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                            (
+                                ngo_id,
+                                ngo_name,
+                                contact_person,
+                                contact,
+                                email,
+                                ngo_address,
+                                ngo_latitude,
+                                ngo_longitude,
+                                service_area,
+                                max_capacity,
+                                storage_available,
+                                food_type_needed,
+                                quantity_needed,
+                                quantity_unit,
+                                priority,
+                                remarks
+                            )
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                         """, (
-                            user["id"], ngo_name, contact_person, contact, email, ngo_address,
-                            service_area, max_capacity, storage, food_needed, quantity_needed,
-                            quantity_unit, priority, remarks
+                            user["id"],
+                            ngo_name,
+                            contact_person,
+                            contact,
+                            email,
+                            ngo_address,
+                            ngo_latitude,
+                            ngo_longitude,
+                            service_area,
+                            max_capacity,
+                            storage,
+                            food_needed,
+                            quantity_needed,
+                            quantity_unit,
+                            priority,
+                            remarks
                         ))
                         conn.commit()
                         st.success("Demand posted. Organization will review and match.")
@@ -1101,6 +1248,10 @@ def dashboard_organization():
                     st.write(donation["food_type"], "/", donation["food_category"])
                     st.write("Quantity:", donation["quantity"], donation["quantity_unit"])
                     st.write("Pickup:", short_text(donation["pickup_address"], 60))
+                    if match["distance"] is not None:
+                        st.write(f"📍 Distance: {match['distance']:.2f} km")
+                    else:
+                        st.write("📍 Distance: Location unavailable")
 
                 with col_b:
                     st.write("🤝 NGO")
