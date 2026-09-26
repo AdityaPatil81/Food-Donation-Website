@@ -253,26 +253,26 @@ def send_welcome_email(receiver_email, full_name, role):
         msg["To"] = receiver_email
 
         msg.set_content(f"""
-            Hello {full_name},
+Hello {full_name},
 
-            Welcome to IoT FeedBridge! 🌿
+Welcome to IoT FeedBridge! 🌿
 
-            Your account has been successfully created.
+Your account has been successfully created.
 
-            Account Details:
+Account Details:
 
-            Name: {full_name}
-            Role: {role.title()}
-            Email: {receiver_email}
+Name: {full_name}
+Role: {role.title()}
+Email: {receiver_email}
 
-            Your email has been successfully verified.
+Your email has been successfully verified.
 
-            You can now log in to the IoT FeedBridge platform.
+You can now log in to the IoT FeedBridge platform.
 
-            Thank you for joining us!
+Thank you for joining us!
 
-            Regards,
-            IoT FeedBridge Team
+Regards,
+IoT FeedBridge Team
             """)
 
         with smtplib.SMTP("smtp.gmail.com", 587) as server:
@@ -1433,19 +1433,19 @@ def dashboard_ngo():
                                                 donor_email,
                                                 "🤝 Donation Accepted - IoT FeedBridge",
                                                 f"""
-                                                Hello {donor["full_name"]},
+Hello {donor["full_name"]},
 
-                                                Your food donation has been accepted by {user["full_name"]}.
+Your food donation has been accepted by {user["full_name"]}.
 
-                                                Food: {row["food_type"]} / {row["food_category"]}
-                                                Quantity: {qty} {row["quantity_unit"]}
-                                                Pickup Time: {pickup_time}
+Food: {row["food_type"]} / {row["food_category"]}
+Quantity: {qty} {row["quantity_unit"]}
+Pickup Time: {pickup_time}
 
-                                                Please log in to IoT FeedBridge for further updates.
+Please log in to IoT FeedBridge for further updates.
 
-                                                Regards,
-                                                IoT FeedBridge Team
-                                                """
+Regards,
+IoT FeedBridge Team
+"""
                                             )
 
                                     st.success("Response submitted successfully.")
@@ -1549,26 +1549,24 @@ def dashboard_organization():
                             ngo_email,
                             "✅ Smart Match Approved - IoT FeedBridge",
                             f"""
-                            Hello {demand["ngo_name"]},
+Hello {demand["ngo_name"]},
 
-                            Good news! 🎉
+The Organization has approved a smart match for your NGO.
 
-                            The Organization has approved a smart match for your NGO.
+Donation Details:
 
-                            Donation Details:
+Food Type: {donation["food_type"]}
+Food Category: {donation["food_category"]}
+Quantity: {donation["quantity"]} {donation["quantity_unit"]}
+Donor: {donation["org_name"]}
 
-                            Food Type: {donation["food_type"]}
-                            Food Category: {donation["food_category"]}
-                            Quantity: {donation["quantity"]} {donation["quantity_unit"]}
-                            Donor: {donation["org_name"]}
+The donation is now available for your review.
 
-                            The donation is now available for your review.
+Please log in to the IoT FeedBridge platform and respond to the donation.
 
-                            Please log in to the IoT FeedBridge platform and respond to the donation.
-
-                            Regards,
-                            IoT FeedBridge Team
-                            """
+Regards,
+IoT FeedBridge Team
+"""
                         )
 
                         st.success("✅ Match approved and NGO has been notified.")
@@ -1710,21 +1708,21 @@ def volunteer_tab():
                                     volunteer["email"],
                                     "🚴 Pickup Assignment - IoT FeedBridge",
                                     f"""
-                                    Hello {volunteer["full_name"]},
+Hello {volunteer["full_name"]},
 
-                                    You have been assigned a food donation pickup.
+You have been assigned a food donation pickup.
 
-                                    Food: {donation["food_type"]} / {donation["food_category"]}
-                                    Quantity: {donation["quantity"]} {donation["quantity_unit"]}
-                                    Pickup Location: {donation["pickup_address"]}
-                                    Drop Location: {drop_location}
-                                    Assigned Time: {assigned_time}
+Food: {donation["food_type"]} / {donation["food_category"]}
+Quantity: {donation["quantity"]} {donation["quantity_unit"]}
+Pickup Location: {donation["pickup_address"]}
+Drop Location: {drop_location}
+Assigned Time: {assigned_time}
 
-                                    Please log in to IoT FeedBridge for further details.
+Please log in to IoT FeedBridge for further details.
 
-                                    Regards,
-                                    IoT FeedBridge Team
-                                    """
+Regards,
+IoT FeedBridge Team
+"""
                                 )
 
                             st.success("Volunteer assigned successfully.")
