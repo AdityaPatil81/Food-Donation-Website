@@ -332,6 +332,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
 def find_matches():
     conn = get_conn()
+
     donations = conn.execute("SELECT * FROM food_donations WHERE status='pending'").fetchall()
     demands = conn.execute("SELECT * FROM ngo_demands WHERE status='pending'").fetchall()
     conn.close()
@@ -340,15 +341,105 @@ def find_matches():
 
     for donation in donations:
         for demand in demands:
-            score = 0
 
-            if donation["food_type"] == demand["food_type_needed"]:
-                score = score + 3
+            food_type_score = 0
 
-            if donation["quantity"] >= demand["quantity_needed"]:
-                score = score + 2
+            donation_food_type = donation["food_type"]
+            required_food_type = demand["food_type_needed"]
 
+            if required_food_type == "Both":
+                food_type_score = 30
+
+            elif donation_food_type == required_food_type:
+                food_type_score = 30
+
+            else:
+                food_type_score = 0
+
+
+
+            quantity_score = 0
+
+            donation_quantity = float(donation["quantity"])
+            required_quantity = float(demand["quantity_needed"])
+
+            if required_quantity > 0:
+
+                quantity_ratio = donation_quantity / required_quantity
+
+                if quantity_ratio >= 1:
+                    quantity_score = 20
+
+                elif quantity_ratio >= 0.75:
+                    quantity_score = 15
+
+                elif quantity_ratio >= 0.50:
+                    quantity_score = 10
+
+                elif quantity_ratio >= 0.25:
+                    quantity_score = 5
+
+                else:
+                    quantity_score = 0
+
+
+        
+
+            category_score = 0
+
+            donation_category = str(
+                donation["food_category"]
+            ).strip().lower()
+
+            # If the NGO has a category field available,
+            # compare it with the donation category.
+            #
+            # For now, if the demand does not contain a
+            # food category, give a neutral score.
+
+            if "food_category_needed" in demand.keys():
+
+                required_category = str(
+                    demand["food_category_needed"]
+                ).strip().lower()
+
+                if required_category == "":
+                    category_score = 7.5
+
+                elif donation_category == required_category:
+                    category_score = 15
+
+                else:
+                    category_score = 0
+
+            else:
+                # Category requirement is not currently
+                # available in the NGO demand table.
+                category_score = 7.5
+
+
+
+            priority_score = 0
+
+            priority = str(
+                demand["priority"]
+            ).strip().lower()
+
+            if priority == "high":
+                priority_score = 15
+
+            elif priority == "medium":
+                priority_score = 10
+
+            elif priority == "low":
+                priority_score = 5
+
+
+
+
+            distance_score = 0
             distance = None
+
             donation_lat = donation["pickup_latitude"]
             donation_lon = donation["pickup_longitude"]
 
@@ -361,26 +452,116 @@ def find_matches():
                 and ngo_lat is not None
                 and ngo_lon is not None
             ):
+
                 try:
+
                     distance = calculate_distance(
                         donation_lat,
                         donation_lon,
                         ngo_lat,
                         ngo_lon
                     )
-                except (ValueError, TypeError):
-                    distance = None
 
-            if score >= 2:
+                    if distance <= 2:
+                        distance_score = 10
+
+                    elif distance <= 5:
+                        distance_score = 8
+
+                    elif distance <= 10:
+                        distance_score = 5
+
+                    elif distance <= 20:
+                        distance_score = 2
+
+                    else:
+                        distance_score = 0
+
+                except (ValueError, TypeError):
+
+                    distance = None
+                    distance_score = 0
+
+
+          
+
+            freshness_score = 0
+
+            prep_time = str(
+                donation["prep_time"]
+            ).strip().lower()
+
+            if prep_time:
+
+                if (
+                    "now" in prep_time
+                    or "just" in prep_time
+                    or "fresh" in prep_time
+                ):
+                    freshness_score = 10
+
+                elif (
+                    "1 hour" in prep_time
+                    or "1 hr" in prep_time
+                    or "2 hour" in prep_time
+                    or "2 hr" in prep_time
+                ):
+                    freshness_score = 8
+
+                elif (
+                    "3 hour" in prep_time
+                    or "3 hr" in prep_time
+                    or "4 hour" in prep_time
+                    or "4 hr" in prep_time
+                    or "5 hour" in prep_time
+                ):
+                    freshness_score = 5
+
+                else:
+                    freshness_score = 3
+
+
+
+            total_score = (
+                food_type_score
+                + quantity_score
+                + category_score
+                + priority_score
+                + distance_score
+                + freshness_score
+            )
+
+
+            total_score = round(total_score, 1)
+
+
+
+            if food_type_score > 0:
+
                 item = {
                     "donation": dict(donation),
                     "demand": dict(demand),
-                    "score": score,
+
+                    "score": total_score,
+
+                    "food_type_score": food_type_score,
+                    "quantity_score": quantity_score,
+                    "category_score": category_score,
+                    "priority_score": priority_score,
+                    "distance_score": distance_score,
+                    "freshness_score": freshness_score,
+
                     "distance": distance
                 }
+
                 matches.append(item)
 
-    matches.sort(key=lambda item: (-item["score"], item["distance"] if item["distance"] is not None else float("inf")))
+
+    matches.sort(
+        key=lambda item: item["score"],
+        reverse=True
+    )
+
     return matches
 
 
@@ -1224,7 +1405,7 @@ def dashboard_organization():
     ])
 
     with tab1:
-        st.subheader("🤖 AI-Suggested Matches")
+        st.subheader("🤖 Smart Matches")
         matches = find_matches()
 
         if not matches:
@@ -1235,10 +1416,26 @@ def dashboard_organization():
             demand = match["demand"]
 
             with st.container(border=True):
-                if match["score"] >= 4:
-                    st.success("🔥 Strong Match - Score " + str(match["score"]) + "/5")
+                if match["score"] >= 80:
+                    st.success(f"🔥 Excellent Match - {match['score']:.1f}%")
+
+                elif match["score"] >= 60:
+                    st.info(f"✅ Good Match - {match['score']:.1f}%")
+
+                elif match["score"] >= 40:
+                    st.warning(f"⚠️ Moderate Match - {match['score']:.1f}%")
+
                 else:
-                    st.info("✅ Good Match - Score " + str(match["score"]) + "/5")
+                    st.error(f"❌ Weak Match - {match['score']:.1f}%")
+
+                with st.expander("📊 View Match Score Breakdown"):
+
+                    st.write(f"🍱 Food Type: {match['food_type_score']}/30")
+                    st.write(f"📦 Quantity: {match['quantity_score']}/20")
+                    st.write(f"🥗 Category: {match['category_score']}/15")
+                    st.write(f"🚨 Priority: {match['priority_score']}/15")
+                    st.write(f"📍 Distance: {match['distance_score']}/10")
+                    st.write(f"🕐 Freshness: {match['freshness_score']}/10")
 
                 col_a, col_b = st.columns(2)
 
