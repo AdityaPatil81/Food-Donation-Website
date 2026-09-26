@@ -1380,17 +1380,82 @@ def dashboard_ngo():
                             submitted = st.form_submit_button("Submit Response")
 
                             if submitted:
+
                                 conn = get_conn()
-                                conn.execute("""
-                                INSERT INTO ngo_responses
-                                (ngo_id,donation_id,action,quantity_accepted,preferred_pickup_time,priority,remarks)
-                                VALUES (%s,%s,%s,%s,%s,%s,%s)
-                                """, (
-                                    user["id"], row["id"], action, qty, pickup_time, priority, remarks
-                                ))
-                                conn.commit()
-                                conn.close()
-                                st.success("Response submitted")
+
+                                try:
+                                    conn.execute("""
+                                        INSERT INTO ngo_responses
+                                        (ngo_id, donation_id, action, quantity_accepted,
+                                        preferred_pickup_time, priority, remarks)
+                                        VALUES (%s,%s,%s,%s,%s,%s,%s)
+                                    """, (
+                                        user["id"],
+                                        row["id"],
+                                        action,
+                                        qty,
+                                        pickup_time,
+                                        priority,
+                                        remarks
+                                    ))
+
+                                    if action == "Accept":
+                                        conn.execute(
+                                            """
+                                            UPDATE food_donations
+                                            SET status='accepted'
+                                            WHERE id=%s
+                                            """,
+                                            (row["id"],)
+                                        )
+
+                                    conn.commit()
+
+                                    if action == "Accept":
+
+                                        donor_email = None
+
+                                        donor = conn.execute(
+                                            """
+                                            SELECT email, full_name
+                                            FROM users
+                                            WHERE id=%s
+                                            """,
+                                            (row["donor_id"],)
+                                        ).fetchone()
+
+                                        if donor:
+                                            donor_email = donor["email"]
+
+                                        if donor_email:
+
+                                            send_notification_email(
+                                                donor_email,
+                                                "🤝 Donation Accepted - IoT FeedBridge",
+                                                f"""
+                                                Hello {donor["full_name"]},
+
+                                                Your food donation has been accepted by {user["full_name"]}.
+
+                                                Food: {row["food_type"]} / {row["food_category"]}
+                                                Quantity: {qty} {row["quantity_unit"]}
+                                                Pickup Time: {pickup_time}
+
+                                                Please log in to IoT FeedBridge for further updates.
+
+                                                Regards,
+                                                IoT FeedBridge Team
+                                                """
+                                            )
+
+                                    st.success("Response submitted successfully.")
+
+                                except mysql.connector.Error as e:
+                                    conn.rollback()
+                                    st.error(f"Database Error: {e}")
+
+                                finally:
+                                    conn.close()
                                 st.rerun()
 
 
@@ -1468,19 +1533,53 @@ def dashboard_organization():
                     st.write("Serves:", demand["max_capacity"])
 
                 key = "approve_" + str(donation["id"]) + "_" + str(demand["id"])
+
                 if st.button("✅ Approve Match", key=key):
+
                     conn = get_conn()
-                    conn.execute(
-                        "UPDATE food_donations SET status='matched', matched_ngo_id=%s WHERE id=%s",
-                        (demand["ngo_id"], donation["id"])
-                    )
-                    conn.execute(
-                        "UPDATE ngo_demands SET status='matched', matched_donation_id=%s WHERE id=%s",
-                        (donation["id"], demand["id"])
-                    )
-                    conn.commit()
-                    conn.close()
-                    st.success("Match approved.")
+
+                    try:
+                        conn.execute("""UPDATE food_donations SET status='matched', matched_ngo_id=%s WHERE id=%s""",(demand["ngo_id"], donation["id"]))
+                        conn.execute("""UPDATE ngo_demands SET status='matched', matched_donation_id=%s WHERE id=%s""",(donation["id"], demand["id"]))  
+                        conn.commit()
+
+                        ngo_email = demand["email"]
+
+                        send_notification_email(
+                            ngo_email,
+                            "✅ Smart Match Approved - IoT FeedBridge",
+                            f"""
+                            Hello {demand["ngo_name"]},
+
+                            Good news! 🎉
+
+                            The Organization has approved a smart match for your NGO.
+
+                            Donation Details:
+
+                            Food Type: {donation["food_type"]}
+                            Food Category: {donation["food_category"]}
+                            Quantity: {donation["quantity"]} {donation["quantity_unit"]}
+                            Donor: {donation["org_name"]}
+
+                            The donation is now available for your review.
+
+                            Please log in to the IoT FeedBridge platform and respond to the donation.
+
+                            Regards,
+                            IoT FeedBridge Team
+                            """
+                        )
+
+                        st.success("✅ Match approved and NGO has been notified.")
+
+                    except mysql.connector.Error as e:
+                        conn.rollback()
+                        st.error(f"Database Error: {e}")
+
+                    finally:
+                        conn.close()
+
                     st.rerun()
 
     with tab2:
@@ -1570,24 +1669,74 @@ def volunteer_tab():
                         volunteer_id = volunteer_ids[index]
 
                         conn = get_conn()
-                        conn.execute("""
-                        INSERT INTO volunteer_assignments
-                        (volunteer_id,donation_id,pickup_location,drop_location,assigned_time)
-                        VALUES (%s,%s,%s,%s,%s)
-                        """, (
-                            volunteer_id,
-                            donation["id"],
-                            donation["pickup_address"],
-                            drop_location,
-                            assigned_time
-                        ))
-                        conn.execute(
-                            "UPDATE food_donations SET assigned_volunteer_id=%s, status='assigned' WHERE id=%s",
-                            (volunteer_id, donation["id"])
-                        )
-                        conn.commit()
-                        conn.close()
-                        st.success("Volunteer assigned.")
+
+                        try:
+                            conn.execute("""
+                            INSERT INTO volunteer_assignments
+                            (volunteer_id, donation_id, pickup_location, drop_location, assigned_time)
+                            VALUES (%s,%s,%s,%s,%s)
+                            """, (
+                                volunteer_id,
+                                donation["id"],
+                                donation["pickup_address"],
+                                drop_location,
+                                assigned_time
+                            ))
+
+                            conn.execute(
+                                """
+                                UPDATE food_donations
+                                SET assigned_volunteer_id=%s,
+                                    status='assigned'
+                                WHERE id=%s
+                                """,
+                                (volunteer_id, donation["id"])
+                            )
+
+                            conn.commit()
+
+                            volunteer = conn.execute(
+                                """
+                                SELECT email, full_name
+                                FROM users
+                                WHERE id=%s
+                                """,
+                                (volunteer_id,)
+                            ).fetchone()
+
+                            if volunteer:
+
+                                send_notification_email(
+                                    volunteer["email"],
+                                    "🚴 Pickup Assignment - IoT FeedBridge",
+                                    f"""
+                                    Hello {volunteer["full_name"]},
+
+                                    You have been assigned a food donation pickup.
+
+                                    Food: {donation["food_type"]} / {donation["food_category"]}
+                                    Quantity: {donation["quantity"]} {donation["quantity_unit"]}
+                                    Pickup Location: {donation["pickup_address"]}
+                                    Drop Location: {drop_location}
+                                    Assigned Time: {assigned_time}
+
+                                    Please log in to IoT FeedBridge for further details.
+
+                                    Regards,
+                                    IoT FeedBridge Team
+                                    """
+                                )
+
+                            st.success("Volunteer assigned successfully.")
+
+                        except mysql.connector.Error as e:
+
+                            conn.rollback()
+                            st.error(f"Database Error: {e}")
+
+                        finally:
+                            conn.close()
+
                         st.rerun()
             else:
                 st.warning("No volunteers registered yet.")
