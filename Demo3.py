@@ -1418,25 +1418,6 @@ def dashboard_organization():
         st.subheader("🤖 Smart Matches")
         matches = find_matches()
 
-        if st.button("📧 Test Notification Email"):
-            result = send_notification_email(
-        "feedbridge.team@gmail.com",
-        "Test Notification - IoT FeedBridge",
-        """Hello,
-
-This is a test notification from IoT FeedBridge.
-
-The notification email system is working successfully.
-
-Regards,
-IoT FeedBridge Team"""
-    )
-
-    if result:
-        st.success("✅ Test notification email sent!")
-    else:
-        st.error("❌ Failed to send notification email.")
-
         if not matches:
             st.info("No pending matches found.")
 
