@@ -7,6 +7,7 @@ import re
 import random
 import smtplib
 import time
+from datetime import datetime
 from email.message import EmailMessage
 from math import radians, sin, cos, sqrt, atan2
 
@@ -464,41 +465,43 @@ def find_matches():
 
 
           
-
             freshness_score = 0
 
-            prep_time = str(
-                donation["prep_time"]
-            ).strip().lower()
+            try:
+                prep_datetime = donation["prep_time"]
 
-            if prep_time:
+                if isinstance(prep_datetime, str):
+                    prep_datetime = datetime.strptime(
+                    prep_datetime,
+                    "%Y-%m-%d %H:%M:%S"
+                    )
 
-                if (
-                    "now" in prep_time
-                    or "just" in prep_time
-                    or "fresh" in prep_time
-                ):
+                current_time = datetime.now()
+
+                food_age = current_time - prep_datetime
+
+                age_hours = food_age.total_seconds() / 3600
+
+                if age_hours < 0:
+                    freshness_score = 0
+
+                elif age_hours <= 1:
                     freshness_score = 10
 
-                elif (
-                    "1 hour" in prep_time
-                    or "1 hr" in prep_time
-                    or "2 hour" in prep_time
-                    or "2 hr" in prep_time
-                ):
+                elif age_hours <= 2:
                     freshness_score = 8
 
-                elif (
-                    "3 hour" in prep_time
-                    or "3 hr" in prep_time
-                    or "4 hour" in prep_time
-                    or "4 hr" in prep_time
-                    or "5 hour" in prep_time
-                ):
-                    freshness_score = 5
+                elif age_hours <= 4:
+                    freshness_score = 6
+
+                elif age_hours <= 6:
+                    freshness_score = 3
 
                 else:
-                    freshness_score = 3
+                    freshness_score = 0
+
+            except (ValueError, TypeError, AttributeError):
+                freshness_score = 0
 
 
 
@@ -510,8 +513,6 @@ def find_matches():
                 + distance_score
                 + freshness_score
             )
-
-
             total_score = round(total_score, 1)
 
 
@@ -1058,7 +1059,8 @@ def dashboard_donor():
 
             with col3:
                 quantity = st.number_input("Quantity", min_value=0.0, step=0.5)
-                prep_time = st.text_input("Time of Preparation")
+                prep_date = st.date_input("Date of Preparation")
+                prep_time_value = st.time_input("Time of Preparation")
 
             with col4:
                 pickup_address = st.text_area("Pickup Address")
@@ -1082,6 +1084,7 @@ def dashboard_donor():
                     placeholder="Any special instructions for pickup..."
                 )
             submitted = st.form_submit_button("🚀 Submit Donation", use_container_width=True)
+            prep_datetime = datetime.combine(prep_date,prep_time_value)
 
             if submitted:
                 if pickup_latitude == 0 or pickup_longitude == 0:
@@ -1128,7 +1131,7 @@ def dashboard_donor():
                                 food_category,
                                 quantity,
                                 quantity_unit,
-                                prep_time,
+                                prep_datetime,
                                 pickup_address,
                                 pickup_latitude,
                                 pickup_longitude,
