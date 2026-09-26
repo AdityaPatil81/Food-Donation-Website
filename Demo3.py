@@ -73,10 +73,6 @@ def get_conn():
         )
     )
 
-def is_valid_email(email):
-    pattern = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
-    return re.match(pattern, email) is not None
-
 def init_db():
     conn = get_conn()
     cur = conn.cursor()
@@ -184,6 +180,10 @@ def register_user(username, password, role, full_name, contact, email):
         return False
     finally:
         conn.close()
+
+def is_valid_email(email):
+    pattern = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
+    return re.match(pattern, email) is not None
 
 def email_exists(email):
     conn = get_conn()
@@ -350,14 +350,20 @@ def setup_session():
     if "lang" not in st.session_state:
         st.session_state.lang = "English"
 
-    if "registration_data" not in st.session_state:
-        st.session_state.registration_data = None
-
     if "registration_otp" not in st.session_state:
         st.session_state.registration_otp = None
 
     if "otp_expiry" not in st.session_state:
         st.session_state.otp_expiry = None
+
+    if "email_verified" not in st.session_state:
+        st.session_state.email_verified = False
+
+    if "verified_email" not in st.session_state:
+        st.session_state.verified_email = ""
+
+    if "registration_email" not in st.session_state:
+        st.session_state.registration_email = ""
 
 
 def go(page_name):
@@ -608,125 +614,42 @@ def page_auth():
                     st.error(T("invalid_creds"))
 
     with tab2:
-        if st.session_state.registration_otp is not None:
-            st.info(
-                "A 6-digit verification code has been sent to "
-                + st.session_state.registration_data["email"]
-            )
+        with st.form("register_form", clear_on_submit=False):
+            full_name = st.text_input(T("full_name"))
 
-            otp_input = st.text_input(
-                "Enter 6-digit OTP",
-                max_chars=6
-            )
+            contact = st.text_input(T("contact"))
 
-            col1, col2 = st.columns(2)
+            email = st.text_input(T("email"),value=st.session_state.registration_email)
 
-            with col1:
-                if st.button("Verify Email", use_container_width=True):
+            username = st.text_input(T("choose_username"))
 
-                    if st.session_state.otp_expiry is None:
-                        st.error("OTP expired. Please register again.")
+            password = st.text_input(T("choose_password"),type="password")
 
-                    elif time.time() > st.session_state.otp_expiry:
-                        st.error("OTP has expired. Please request a new OTP.")
+            confirm_password = st.text_input(T("confirm_password"),type="password")
 
-                    elif otp_input == st.session_state.registration_otp:
+            create_account = st.form_submit_button(T("create_account"),use_container_width=True)
 
-                        data = st.session_state.registration_data
 
-                        created = register_user(
-                            data["username"],
-                            data["password"],
-                            data["role"],
-                            data["full_name"],
-                            data["contact"],
-                            data["email"]
-                        )
+        if not st.session_state.email_verified:
 
-                        if created:
-                            send_welcome_email(
-                                data["email"],
-                                data["full_name"],
-                                data["role"]
-                            )
-
-                            st.session_state.registration_otp = None
-                            st.session_state.otp_expiry = None
-                            st.session_state.registration_data = None
-
-                            st.success(
-                                "Email verified and account created successfully! "
-                                "Welcome email has been sent."
-                            )
-
-                        else:
-                            st.error(
-                                "Username already exists. Please try another username."
-                            )
-
-                    else:
-                        st.error("Invalid OTP. Please enter the correct code.")
-
-            with col2:
-                if st.button("Cancel Verification", use_container_width=True):
-
-                    st.session_state.registration_otp = None
-                    st.session_state.otp_expiry = None
-                    st.session_state.registration_data = None
-
-                    st.rerun()
-
-        else:
-
-            with st.form("register_form"):
-
-                full_name = st.text_input(T("full_name"))
-
-                contact = st.text_input(T("contact"))
-
-                email = st.text_input(T("email"))
+            if st.button(
+                "Verify Email",
+                use_container_width=True
+            ):
 
                 email = email.strip().lower()
 
-                username = st.text_input(T("choose_username"))
-
-                username = username.strip()
-
-                password = st.text_input(
-                    T("choose_password"),
-                    type="password"
-                )
-
-                confirm_password = st.text_input(
-                    T("confirm_password"),
-                    type="password"
-                )
-
-                submitted = st.form_submit_button(
-                    T("create_account"),
-                    use_container_width=True
-                )
-
-            if submitted:
-
-                if password != confirm_password:
-
-                    st.error(T("pwd_mismatch"))
-
-                elif not full_name or not contact or not username or not password or not email:
-
-                    st.error(T("fill_required"))
-
-                elif len(contact) != 10:
-
-                    st.error("Enter valid contact number.")
+                if not email:
+                    st.error(
+                        "Please enter your email address."
+                    )
 
                 elif not is_valid_email(email):
-
-                    st.error("Please enter a valid email address.")
+                    st.error(
+                        "Please enter a valid email address."
+                    )
 
                 elif email_exists(email):
-
                     st.error(
                         "This email is already registered. "
                         "Please use another email."
@@ -741,14 +664,7 @@ def page_auth():
                     )
 
                     if email_sent:
-                        st.session_state.registration_data = {
-                            "full_name": full_name,
-                            "contact": contact,
-                            "email": email,
-                            "username": username,
-                            "password": password,
-                            "role": role
-                        }
+                        st.session_state.registration_email = email
 
                         st.session_state.registration_otp = otp
 
@@ -757,19 +673,151 @@ def page_auth():
                         )
 
                         st.success(
-                            "Verification code sent to "
-                            + email
+                            "OTP sent to " + email
                         )
 
                         st.rerun()
 
-                    else:
+        if (
+            st.session_state.registration_otp
+            and not st.session_state.email_verified
+        ):
 
-                        st.error(
-                            "Unable to send verification email. "
-                            "Please check your email address and try again."
+            st.info(
+                "Enter the 6-digit OTP sent to "
+                + st.session_state.registration_email
+            )
+
+            otp_input = st.text_input(
+                "Enter OTP",
+                max_chars=6
+            )
+
+            if st.button(
+                "Verify OTP",
+                use_container_width=True
+            ):
+
+                if time.time() > st.session_state.otp_expiry:
+
+                    st.error(
+                        "OTP has expired. Please request a new OTP."
+                    )
+
+                    st.session_state.registration_otp = None
+                    st.session_state.otp_expiry = None
+
+                elif otp_input == st.session_state.registration_otp:
+
+                    st.session_state.email_verified = True
+
+                    st.session_state.verified_email = (
+                        st.session_state.registration_email
+                    )
+
+                    st.session_state.registration_otp = None
+                    st.session_state.otp_expiry = None
+
+                    st.success(
+                        "✅ Email verified successfully!"
+                    )
+
+                    st.rerun()
+
+                else:
+
+                    st.error(
+                        "❌ Invalid OTP. Please try again."
+                    )
+
+        if st.session_state.email_verified:
+
+            st.success(
+                "✅ Email Verified: "
+                + st.session_state.verified_email
+            )
+
+        if create_account:
+
+            email = email.strip().lower()
+
+            if not st.session_state.email_verified:
+
+                st.error(
+                    "Please verify your email before creating the account."
+                )
+
+            elif email != st.session_state.verified_email:
+
+                st.error(
+                    "The email address has changed. "
+                    "Please verify the new email address."
+                )
+
+                st.session_state.email_verified = False
+                st.session_state.verified_email = ""
+
+            elif password != confirm_password:
+
+                st.error(T("pwd_mismatch"))
+
+            elif (
+                not full_name
+                or not contact
+                or not username
+                or not password
+                or not email
+            ):
+
+                st.error(T("fill_required"))
+
+            elif len(contact) != 10:
+
+                st.error(
+                    "Enter valid contact number."
+                )
+
+            else:
+                created = register_user(
+                    username,
+                    password,
+                    role,
+                    full_name,
+                    contact,
+                    email
+                )
+
+                if created:
+                    welcome_sent = send_welcome_email(
+                        email,
+                        full_name,
+                        role
+                    )
+
+                    if welcome_sent:
+                        st.success(
+                            "🎉 Account created successfully! "
+                            "Welcome email has been sent."
                         )
 
+                    else:
+                        st.success(
+                            "🎉 Account created successfully!"
+                        )
+
+                        st.warning(
+                            "Welcome email could not be sent."
+                        )
+
+                    st.session_state.email_verified = False
+                    st.session_state.verified_email = ""
+                    st.session_state.registration_email = ""
+
+                else:
+                    st.error(
+                        T("username_exists")
+                    )
+                    
 
 def dashboard_donor():
     user = st.session_state.user
