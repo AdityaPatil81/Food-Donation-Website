@@ -1230,6 +1230,7 @@ def dashboard_ngo():
                 )
 
             food_needed = st.selectbox("Food Type Needed", ["Veg", "Non-Veg", "Both"])
+            food_category_needed = st.selectbox("Food Category Needed",["Cooked", "Packaged", "Raw"])
             quantity_needed = st.number_input("Quantity Needed", min_value=0.0, step=0.5)
             quantity_unit = st.selectbox("Unit", ["Person-wise", "Kg"])
             priority = st.selectbox("Priority Level", ["High", "Medium", "Low"], index=1)
