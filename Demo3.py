@@ -1967,8 +1967,7 @@ def spoilage_detection():
         else:
             st.error("🔴 SPOILED FOOD")
             st.caption("One or more environmental parameters have exceeded the spoilage threshold.")
-
-if food_type == "Vegetarian":
+            
 
         if food_type == "Vegetarian":
 
