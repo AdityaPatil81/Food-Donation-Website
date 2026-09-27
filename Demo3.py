@@ -1995,20 +1995,12 @@ def spoilage_detection():
             try:
                 prediction = veg_model.predict(sample)[0]
 
-                probabilities = veg_model.predict_proba(sample)[0]
-                confidence = probabilities[prediction] * 100
-
                 st.subheader("🤖 Prediction")
 
                 if prediction == 0:
                     st.success("🟢 FRESH FOOD")
                 else:
                     st.error("🔴 SPOILED FOOD")
-
-                st.metric(
-                    "Model Confidence",
-                    f"{confidence:.2f}%"
-                )
 
             except Exception as e:
                 st.error(f"Prediction Error: {e}")
@@ -2036,20 +2028,12 @@ def spoilage_detection():
             try:
                 prediction = nonveg_model.predict(sample)[0]
 
-                probabilities = nonveg_model.predict_proba(sample)[0]
-                confidence = probabilities[prediction] * 100
-
                 st.subheader("🤖 Prediction")
 
                 if prediction == 0:
                     st.success("🟢 FRESH FOOD")
                 else:
                     st.error("🔴 SPOILED FOOD")
-
-                st.metric(
-                    "Model Confidence",
-                    f"{confidence:.2f}%"
-                )
 
             except Exception as e:
                 st.error(f"Prediction Error: {e}")
