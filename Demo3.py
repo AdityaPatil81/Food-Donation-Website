@@ -1929,8 +1929,8 @@ def spoilage_detection():
         )
 
         col6.metric(
-            "Ethylene",
-            f"{data['ethylene']:.2f}"
+            "Ethylene Response Index",
+            f"{data['ethylene']:.2f} %"
         )
 
         col7.metric(
