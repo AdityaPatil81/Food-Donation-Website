@@ -1873,7 +1873,7 @@ def spoilage_detection():
         ["Vegetarian", "Non-Vegetarian"]
     )
 
-    @st.fragment(run_every=4)
+    @st.fragment(run_every=3)
     def live_detection():
 
         conn = get_conn()
@@ -1945,9 +1945,30 @@ def spoilage_detection():
 
         st.divider()
 
-        st.caption(
-            "Last Record ID: " + str(data["id"])
-        )
+        st.caption("Last Record ID: " + str(data["id"]))
+
+        # Calculate current food risk
+        risk_status, risk_details = calculate_food_risk(food_type, data)
+
+        st.subheader("⚠️ Food Risk Status")
+
+        if risk_status == "LOW RISK":
+            st.success("🟢 LOW RISK")
+            st.caption("Environmental parameters are within the normal monitoring range.")
+
+        elif risk_status == "MODERATE RISK":
+            st.warning("🟡 MODERATE RISK")
+            st.caption("One or more environmental parameters are approaching the spoilage threshold.")
+
+        elif risk_status == "HIGH RISK":
+            st.warning("🟠 HIGH RISK")
+            st.caption("One or more environmental parameters are close to the spoilage threshold.")
+
+        else:
+            st.error("🔴 SPOILED FOOD")
+            st.caption("One or more environmental parameters have exceeded the spoilage threshold.")
+
+if food_type == "Vegetarian":
 
         if food_type == "Vegetarian":
 
