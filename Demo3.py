@@ -1775,6 +1775,92 @@ def volunteer_tab():
             st.write("Time:", assignment["assigned_time"])
 
 
+def calculate_food_risk(food_type, data):
+    """
+    Calculates food risk based on the current environmental parameters.
+
+    Returns:
+        status: LOW RISK / MODERATE RISK / HIGH RISK / SPOILED FOOD
+        reasons: parameters contributing to the current risk
+    """
+
+    risks = []
+
+    if food_type == "Vegetarian":
+
+        # Spoilage thresholds from the ML training dataset
+        thresholds = {
+            "CO2": 1500,
+            "VOC": 300,
+            "ethanol": 50
+        }
+
+        parameters = {
+            "CO₂": data["CO2"],
+            "VOC": data["VOC"],
+            "Ethanol": data["ethanol"]
+        }
+
+    else:
+
+        # Spoilage thresholds from the ML training dataset
+        thresholds = {
+            "NH3": 20,
+            "H2S": 2
+        }
+
+        parameters = {
+            "NH₃": data["NH3"],
+            "H₂S": data["H2S"]
+        }
+
+    # Check every parameter
+    for display_name, value in parameters.items():
+
+        if display_name == "CO₂":
+            threshold = thresholds["CO2"]
+
+        elif display_name == "VOC":
+            threshold = thresholds["VOC"]
+
+        elif display_name == "Ethanol":
+            threshold = thresholds["ethanol"]
+
+        elif display_name == "NH₃":
+            threshold = thresholds["NH3"]
+
+        elif display_name == "H₂S":
+            threshold = thresholds["H2S"]
+
+        # Percentage of the spoilage threshold
+        percentage = (value / threshold) * 100
+
+        risks.append({
+            "parameter": display_name,
+            "value": value,
+            "threshold": threshold,
+            "percentage": percentage
+        })
+
+    # If ANY parameter exceeds the spoilage threshold
+    if any(r["percentage"] > 100 for r in risks):
+        status = "SPOILED FOOD"
+
+    # If any parameter reaches 90% of the threshold
+    elif any(r["percentage"] >= 90 for r in risks):
+        status = "HIGH RISK"
+
+    # If any parameter reaches 70% of the threshold
+    elif any(r["percentage"] >= 70 for r in risks):
+        status = "MODERATE RISK"
+
+    # Otherwise
+    else:
+        status = "LOW RISK"
+
+    return status, risks
+    
+
 def spoilage_detection():
 
     if st.button("⬅️ Back to Home"):
