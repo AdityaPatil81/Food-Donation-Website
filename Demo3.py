@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 from email.message import EmailMessage
 from math import radians, sin, cos, sqrt, atan2
+from ollama import chat
 
 veg_model = joblib.load("veg_model.pkl")
 nonveg_model = joblib.load("nonveg_model.pkl")
@@ -811,6 +812,8 @@ def page_home():
     if st.button("🍎 Food Spoilage Detection", use_container_width=True):
         go("spoilage")
 
+    if st.button("🤖 FeedBridge AI Assistant", use_container_width=True):
+        go("chatbot")
 
 def page_auth():
     role = st.session_state.role
@@ -2219,6 +2222,114 @@ IoT FeedBridge Team
         col1.metric("Total Assignments", total_assignments)
         col2.metric("Delivered", total_delivered)
 
+
+def chatbot():
+
+    if st.button("⬅️ Back to Home"):
+        go("home")
+
+    st.title("🤖 FeedBridge AI Assistant")
+
+    st.caption("Ask questions about IoT FeedBridge and food donation.")
+
+    if "chat_messages" not in st.session_state:
+
+        st.session_state.chat_messages = [
+            {
+                "role": "system",
+                "content": """
+You are the AI Assistant for IoT FeedBridge.
+
+IoT FeedBridge is a smart food donation and redistribution platform.
+
+The platform connects:
+1. Food Donors
+2. NGOs
+3. Organizations
+4. Volunteers
+
+Main features:
+- Food donation submission
+- NGO food demand requests
+- Smart matching between donations and NGO demands
+- Volunteer pickup and delivery
+- Delivery status tracking
+- Email notifications
+- IoT-based food spoilage detection
+
+The smart matching considers:
+- Food type
+- Quantity
+- Food category
+- NGO priority
+- Distance
+- Food freshness
+
+Food spoilage detection uses IoT sensor data such as:
+- Temperature
+- Humidity
+- CO2
+- VOC
+- Ethanol
+- Ethylene
+- NH3
+- H2S
+
+Answer in simple, clear language.
+If someone asks about FeedBridge, explain according to this information.
+"""
+            }
+        ]
+
+    for message in st.session_state.chat_messages:
+
+        if message["role"] != "system":
+
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
+
+    prompt = st.chat_input("Ask FeedBridge AI...")
+
+    if prompt:
+
+        with st.chat_message("user"):
+            st.write(prompt)
+
+        st.session_state.chat_messages.append(
+            {
+                "role": "user",
+                "content": prompt
+            }
+        )
+
+        try:
+
+            response = chat(
+                model="llama3.2:1b",
+                messages=st.session_state.chat_messages
+            )
+
+            answer = response.message.content
+
+            with st.chat_message("assistant"):
+                st.write(answer)
+
+            st.session_state.chat_messages.append(
+                {
+                    "role": "assistant",
+                    "content": answer
+                }
+            )
+
+        except Exception as e:
+
+            st.error(
+                "⚠️ Could not connect to Ollama. "
+                "Please make sure Ollama is running."
+            )
+
+            st.caption(str(e))
+
 init_db()
 setup_session()
 
@@ -2230,6 +2341,8 @@ elif page == "auth":
     page_auth()
 elif page == "spoilage":
     spoilage_detection()
+elif page == "chatbot":
+    chatbot()
 elif page == "dashboard_donor":
     if st.session_state.user:
         dashboard_donor()
