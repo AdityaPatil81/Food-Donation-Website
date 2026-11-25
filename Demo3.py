@@ -10,7 +10,17 @@ import time
 from datetime import datetime
 from email.message import EmailMessage
 from math import radians, sin, cos, sqrt, atan2
-from ollama import chat
+from groq import Groq
+
+@st.cache_resource
+def get_groq_client():
+
+    api_key = st.secrets.get("GROQ_API_KEY")
+
+    if not api_key:
+        raise ValueError("Groq API key not configured.")
+
+    return Groq(api_key=api_key)
 
 veg_model = joblib.load("veg_model.pkl")
 nonveg_model = joblib.load("nonveg_model.pkl")
@@ -2331,12 +2341,21 @@ If someone ask about FeedBridge, answer according to this information.
 
         try:
 
-            response = chat(
-                model="llama3.2:3b",
-                messages=st.session_state.chat_messages
+            client = get_groq_client()
+
+            response = client.chat.completions.create(
+
+                model="llama-3.3-70b-versatile",
+
+                messages=st.session_state.chat_messages,
+
+                temperature=0.7,
+
+                max_tokens=700
+
             )
 
-            answer = response.message.content
+            answer = response.choices[0].message.content
 
             with st.chat_message("assistant"):
                 st.write(answer)
@@ -2351,11 +2370,10 @@ If someone ask about FeedBridge, answer according to this information.
         except Exception as e:
 
             st.error(
-                "⚠️ Could not connect to Ollama. "
-                "Please make sure Ollama is running."
+                "⚠️ Unable to connect to FeedBridge AI."
             )
 
-            st.caption(str(e))
+            st.caption(f"Error: {e}")
 
 init_db()
 setup_session()
