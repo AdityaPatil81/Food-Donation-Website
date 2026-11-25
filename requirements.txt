@@ -7,3 +7,5 @@ numpy
 joblib
 scikit-learn
 groq
+streamlit-folium
+streamlit-geolocation
