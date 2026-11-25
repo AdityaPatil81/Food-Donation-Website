@@ -2345,7 +2345,7 @@ If someone ask about FeedBridge, answer according to this information.
 
             response = client.chat.completions.create(
 
-                model="llama-3.3-70b-versatile",
+                model="openai/gpt-oss-120b",
 
                 messages=st.session_state.chat_messages,
 
