@@ -11,6 +11,9 @@ from datetime import datetime
 from email.message import EmailMessage
 from math import radians, sin, cos, sqrt, atan2
 from groq import Groq
+import folium
+from streamlit_folium import st_folium
+from streamlit_geolocation import streamlit_geolocation
 
 @st.cache_resource
 def get_groq_client():
@@ -85,6 +88,94 @@ def get_conn():
             use_pure=True
         )
     )
+
+def location_picker(location_type="donor"):
+    lat_key = f"{location_type}_selected_lat"
+    lng_key = f"{location_type}_selected_lng"
+
+    if lat_key not in st.session_state:
+        st.session_state[lat_key] = None
+
+    if lng_key not in st.session_state:
+        st.session_state[lng_key] = None
+
+    st.markdown("### 📍 Select Pickup Location")
+
+    st.caption(
+        "Use your current location or click anywhere on the map "
+        "to select your pickup point."
+    )
+
+    location = streamlit_geolocation()
+
+    if isinstance(location, dict):
+        latitude = location.get("latitude")
+        longitude = location.get("longitude")
+
+        if latitude is not None and longitude is not None:
+
+            st.session_state[lat_key] = float(latitude)
+            st.session_state[lng_key] = float(longitude)
+
+            st.success("✅ Current location detected successfully!")
+
+    selected_lat = st.session_state[lat_key]
+    selected_lng = st.session_state[lng_key]
+
+    if selected_lat is not None and selected_lng is not None:
+        map_center = [selected_lat, selected_lng]
+        zoom_level = 15
+
+    else:
+        map_center = [20.5937, 78.9629]
+        zoom_level = 5
+
+    pickup_map = folium.Map(
+        location=map_center,
+        zoom_start=zoom_level,
+        control_scale=True
+    )
+
+    if selected_lat is not None and selected_lng is not None:
+        folium.Marker(
+            location=[selected_lat, selected_lng],
+            popup="Selected Pickup Location",
+            tooltip="Pickup Location",
+            icon=folium.Icon(color="red", icon="map-marker")
+        ).add_to(pickup_map)
+
+    map_data = st_folium(
+        pickup_map,
+        height=420,
+        width=None,
+        returned_objects=["last_clicked"],
+        key=f"{location_type}_location_map"
+    )
+
+    if map_data and map_data.get("last_clicked"):
+        clicked_location = map_data["last_clicked"]
+
+        st.session_state[lat_key] = float(
+            clicked_location["lat"]
+        )
+
+        st.session_state[lng_key] = float(
+            clicked_location["lng"]
+        )
+
+    selected_lat = st.session_state[lat_key]
+    selected_lng = st.session_state[lng_key]
+
+    if selected_lat is not None and selected_lng is not None:
+
+        st.success("📍 Pickup location selected!")
+
+        st.write(f"**Latitude:** {selected_lat:.7f}")
+        st.write(f"**Longitude:** {selected_lng:.7f}")
+
+        return selected_lat, selected_lng
+
+    return 0.0, 0.0
 
 def init_db():
     conn = get_conn()
@@ -1079,6 +1170,8 @@ def dashboard_donor():
     tab1, tab2 = st.tabs(["➕ Submit Donation", "📋 My Donations"])
 
     with tab1:
+        pickup_latitude, pickup_longitude = location_picker("donor")
+        
         with st.form("donation_form"):
             col1, col2 = st.columns(2)
 
@@ -1101,23 +1194,6 @@ def dashboard_donor():
 
             with col4:
                 pickup_address = st.text_area("Pickup Address",height=100)
-
-                st.divider()
-                st.markdown("### 📍 Pickup Location")
-
-                loc1, loc2 = st.columns(2)
-                with loc1:
-                    pickup_latitude = st.number_input(
-                        "Latitude",
-                        format="%.7f",
-                        key="donor_pickup_latitude"
-                    )
-                with loc2:
-                    pickup_longitude = st.number_input(
-                        "Longitude",
-                        format="%.7f",
-                        key="donor_pickup_longitude"
-                    )
 
                 special_instructions = st.text_area(
                     "Special Instructions",
@@ -1216,6 +1292,8 @@ def dashboard_ngo():
     tab1, tab2, tab3 = st.tabs(["📢 Post Demand", "📋 My Demands", "🔔 Matched Donations"])
 
     with tab1:
+        ngo_latitude, ngo_longitude = location_picker("ngo")
+        
         with st.form("ngo_demand_form"):
             col1, col2 = st.columns(2)
 
@@ -1227,24 +1305,6 @@ def dashboard_ngo():
 
             with col2:
                 ngo_address = st.text_area("NGO Address",height=100)
-
-                st.markdown("### 📍 NGO Location")
-
-                ngo_loc1, ngo_loc2 = st.columns(2)
-
-                with ngo_loc1:
-                    ngo_latitude = st.number_input(
-                        "Latitude",
-                        format="%.7f",
-                        key="ngo_latitude"
-                    )
-
-                with ngo_loc2:
-                    ngo_longitude = st.number_input(
-                        "Longitude",
-                        format="%.7f",
-                        key="ngo_longitude"
-                    )
 
                 service_area = st.text_input("Service Area")
                 max_capacity = st.number_input(
