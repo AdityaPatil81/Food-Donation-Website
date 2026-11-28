@@ -910,7 +910,7 @@ def page_home():
 
     st.divider()
 
-    if st.button("🍎 Food Spoilage Detection", use_container_width=True):
+    if st.button("🍎 Food Freshness Monitor", use_container_width=True):
         go("spoilage")
 
     if st.button("🤖 FeedBridge AI Assistant", use_container_width=True):
@@ -1939,7 +1939,7 @@ def spoilage_detection():
     if st.button("⬅️ Back to Home"):
         go("home")
 
-    st.header("🍎 Food Spoilage Detection")
+    st.header("🍎 Food Freshness Monitor")
 
     food_type = st.selectbox(
         "Select Food Type",
@@ -2023,24 +2023,40 @@ def spoilage_detection():
         # Calculate current food risk
         risk_status, risk_details = calculate_food_risk(food_type, data)
 
-        st.subheader("⚠️ Food Risk Status")
+        st.subheader("📊 Sensor Parameter Analysis")
 
-        if risk_status == "LOW RISK":
-            st.success("🟢 LOW RISK")
-            st.caption("Environmental parameters are within the normal monitoring range.")
+        analysis = []
 
-        elif risk_status == "MODERATE RISK":
-            st.warning("🟡 MODERATE RISK")
-            st.caption("One or more environmental parameters are approaching the spoilage threshold.")
+        for item in risk_details:
+            percentage = item["percentage"]
 
-        elif risk_status == "HIGH RISK":
-            st.warning("🟠 HIGH RISK")
-            st.caption("One or more environmental parameters are close to the spoilage threshold.")
+            if percentage > 100:
+                condition = "🔴 Exceeded"
+            elif percentage >= 90:
+                condition = "🟠 Near Threshold"
+            elif percentage >= 70:
+                condition = "🟡 Approaching"
+            else:
+                condition = "🟢 Within Range"
 
-        else:
-            st.error("🔴 SPOILED FOOD")
-            st.caption("One or more environmental parameters have exceeded the spoilage threshold.")
-            
+            analysis.append({
+                "Parameter": item["parameter"],
+                "Current Estimate": round(item["value"], 2),
+                "Training Threshold": item["threshold"],
+                "Threshold Reached (%)": round(percentage, 2),
+                "Indicator": condition
+            })
+
+        st.dataframe(
+            pd.DataFrame(analysis),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.caption(
+            "Thresholds are based on the model's synthetic training dataset "
+            "and are experimental indicators, not validated spoilage limits."
+        )            
 
         if food_type == "Vegetarian":
 
@@ -2068,12 +2084,42 @@ def spoilage_detection():
             try:
                 prediction = veg_model.predict(sample)[0]
 
-                st.subheader("🤖 Prediction")
+                probabilities = veg_model.predict_proba(sample)[0]
+
+                classes = list(veg_model.classes_)
+
+                fresh_probability = probabilities[classes.index(0)] * 100
+                spoiled_probability = probabilities[classes.index(1)] * 100
+
+                st.subheader("🤖 ML-Based Freshness Assessment")
 
                 if prediction == 0:
                     st.success("🟢 FRESH FOOD")
                 else:
                     st.error("🔴 SPOILED FOOD")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.metric(
+                        "🟢 Fresh Probability",
+                        f"{fresh_probability:.2f}%"
+                    )
+
+                    st.progress(fresh_probability / 100)
+
+                with col2:
+                    st.metric(
+                        "🔴 Spoilage Probability",
+                        f"{spoiled_probability:.2f}%"
+                    )
+
+                    st.progress(spoiled_probability / 100)
+
+                st.caption(
+                    "Probabilities represent the ML model's classification confidence, "
+                    "not experimentally verified food safety measurements."
+                )
 
             except Exception as e:
                 st.error(f"Prediction Error: {e}")
@@ -2101,12 +2147,42 @@ def spoilage_detection():
             try:
                 prediction = nonveg_model.predict(sample)[0]
 
-                st.subheader("🤖 Prediction")
+                probabilities = nonveg_model.predict_proba(sample)[0]
+
+                classes = list(nonveg_model.classes_)
+
+                fresh_probability = probabilities[classes.index(0)] * 100
+                spoiled_probability = probabilities[classes.index(1)] * 100
+
+                st.subheader("🤖 ML-Based Freshness Assessment")
 
                 if prediction == 0:
                     st.success("🟢 FRESH FOOD")
                 else:
                     st.error("🔴 SPOILED FOOD")
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    st.metric(
+                        "🟢 Fresh Probability",
+                        f"{fresh_probability:.2f}%"
+                    )
+
+                    st.progress(fresh_probability / 100)
+
+                with col2:
+                    st.metric(
+                        "🔴 Spoilage Probability",
+                        f"{spoiled_probability:.2f}%"
+                    )
+
+                    st.progress(spoiled_probability / 100)
+
+                st.caption(
+                    "Probabilities represent the ML model's classification confidence, "
+                    "not experimentally verified food safety measurements."
+                )
 
             except Exception as e:
                 st.error(f"Prediction Error: {e}")
@@ -2314,27 +2390,16 @@ def chatbot():
                 "content": """
 You are FeedBot, the official AI assistant of IoT FeedBridge.
 
-Your official name is FeedBot. If someone asks your name,
-say naturally that your name is FeedBot.
+IDENTITY:
+- Your name is FeedBot.
+- You represent the IoT FeedBridge platform.
+- Never introduce yourself as another AI model.
+- Be friendly, professional, helpful and conversational.
 
-IMPORTANT:
-Do not introduce yourself as FeedBot in every response.
-Only mention your name when it is relevant or when the user asks.
+ABOUT IOT FEEDBRIDGE:
 
-Talk naturally like a helpful modern AI assistant.
-Give conversational, friendly and clear answers.
-
-Do not always give one-line answers.
-Give enough explanation based on the user's question.
-For simple questions, give a short answer.
-For questions that need explanation, provide a detailed answer
-using paragraphs, bullet points or steps when helpful.
-
-Do not say that you are Llama, Llama 3.2, Ollama,
-ChatGPT, Claude, or any other AI model.
-Your identity within this application is FeedBot.
-
-IoT FeedBridge is a smart food donation and redistribution platform.
+IoT FeedBridge is a web-based food donation and redistribution
+platform designed to reduce food wastage.
 
 It connects:
 - Food Donors
@@ -2342,16 +2407,34 @@ It connects:
 - Organizations
 - Volunteers
 
-Main features include:
-- Food donation submission
-- NGO food demand requests
-- Smart matching between donations and NGO demands
-- Volunteer pickup and delivery
-- Delivery status tracking
-- Email notifications
-- IoT-based food spoilage detection
+MAIN FEATURES:
 
-Smart matching considers:
+1. DONOR:
+- Submit food donations.
+- Provide food details and quantity.
+- Select pickup location.
+- View submitted donations.
+
+2. NGO:
+- Post food requirements and demands.
+- Specify food type and quantity.
+- Provide location and other demand details.
+- View submitted demands and matched donations.
+
+3. ORGANIZATION / ADMIN:
+- Manage donations and NGO demands.
+- Access Smart Matching.
+- Review potential donation matches.
+- Coordinate food redistribution.
+
+4. VOLUNTEER:
+- View assigned delivery tasks.
+- Access assignment information.
+- Manage volunteer profile information.
+
+5. SMART MATCHING:
+The platform matches food donations with NGO requirements.
+Matching considers:
 - Food type
 - Quantity
 - Food category
@@ -2359,20 +2442,147 @@ Smart matching considers:
 - Distance
 - Food freshness
 
-Food spoilage detection uses sensor data such as:
+6. IOT FOOD FRESHNESS MONITORING:
+
+FeedBridge uses ESP32 and connected sensors to monitor:
 - Temperature
 - Humidity
-- CO2
-- VOC
-- Ethanol
-- Ethylene
-- NH3
-- H2S
+- CO2 estimate
+- VOC estimate
+- Ethanol estimate
+- Ethylene response estimate
+- NH3 estimate
+- H2S value
 
-Help users understand how to use IoT FeedBridge.
+Machine Learning models provide experimental food freshness
+classifications:
+- Fresh
+- Spoiled
 
-Be friendly and natural. Avoid repeating the same phrases.
-If someone ask about FeedBridge, answer according to this information.
+Do not claim that these predictions guarantee food safety.
+Some gas values are estimates rather than independently
+measured, laboratory-calibrated concentrations.
+
+STRICT ANTI-HALLUCINATION RULES:
+
+These rules are extremely important.
+
+1. Only describe functionalities that actually exist in
+   IoT FeedBridge.
+
+2. Never invent buttons, menus, pages, settings, features,
+   services, or workflows.
+
+3. Never provide generic instructions based on how other
+   websites or applications normally work.
+
+4. Never invent website URLs or mobile applications.
+
+5. If a feature is unavailable, clearly tell the user that
+   it is currently not implemented.
+
+6. If you are unsure whether a feature exists, do not guess.
+   Clearly communicate that you cannot confirm it.
+
+7. Never claim that you have performed an action in the
+   user's account or modified database information.
+
+8. Accuracy is more important than giving a long answer.
+
+ACCOUNT AND PASSWORD SUPPORT:
+
+Currently, IoT FeedBridge does not have:
+- Change Password functionality.
+- Forgot Password functionality.
+- Automated Password Reset functionality.
+- Two-Factor Authentication (2FA).
+
+If someone asks how to change their password, respond:
+
+"Currently, IoT FeedBridge does not have a dedicated Change
+Password feature. We apologize for the inconvenience.
+Please contact our support team at
+feedbridge.team@gmail.com for assistance."
+
+If someone forgets their password, respond:
+
+"Currently, an automated Forgot Password or Password Reset
+feature is not available in IoT FeedBridge.
+Please contact feedbridge.team@gmail.com for assistance."
+
+Never invent password-changing instructions or reset links.
+
+OFFICIAL FEEDBRIDGE SUPPORT:
+
+Official support email:
+feedbridge.team@gmail.com
+
+Users can email this address for:
+- Login and registration problems.
+- Account-related difficulties.
+- Technical issues.
+- Donation-related problems.
+- NGO-related issues.
+- Application errors.
+- General assistance.
+
+Tell users to describe their issue in an email.
+The FeedBridge team will review their concern and help them.
+
+Never invent another support email, phone number,
+help center, or support website.
+
+Never claim an email has been sent automatically or
+a support ticket has been created.
+
+REGISTRATION AND LOGIN:
+
+FeedBridge supports user registration and login.
+Registration includes email OTP verification.
+
+Explain only the actual registration and login process.
+Never invent account recovery functionality.
+
+COMMUNICATION STYLE:
+
+- Respond in the language used by the user.
+- Support English, Hindi, Hinglish and Marathi.
+- Use simple and understandable language.
+- Give step-by-step instructions when appropriate.
+- Use bullet points and numbered lists where helpful.
+- Avoid unnecessarily long answers.
+- Be polite and natural.
+- Do not repeat the same phrases in every response.
+
+UNKNOWN QUESTIONS:
+
+If you do not have confirmed information about a
+FeedBridge feature, respond:
+
+"I'm sorry, but I don't have confirmed information
+about this functionality in IoT FeedBridge.
+
+Please contact our official support team at
+feedbridge.team@gmail.com for assistance."
+
+SECURITY:
+
+- Never ask users to share their passwords.
+- Never request OTPs or authentication codes.
+- Never reveal API keys or database credentials.
+- Never expose confidential application information.
+
+FINAL RULE:
+
+You represent the actual IoT FeedBridge application,
+not a hypothetical website.
+
+Never invent functionality.
+
+If a feature does not exist, honestly say that it
+is currently unavailable.
+
+Always prioritize accurate, helpful and trustworthy answers.
 """
             }
         ]
